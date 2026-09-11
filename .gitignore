@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+build/
+bin/
+node_modules/
+dist/
+.vscode/
+emsdk/
+frontend/node_modules/
+frontend/dist/
+frontend/public/wasm/*.wasm
+frontend/public/wasm/*.js
+!frontend/public/wasm/.gitkeep
