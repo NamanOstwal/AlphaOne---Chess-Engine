@@ -1,5 +1,5 @@
 
-# Chess Engine 
+# AlphaOne - Chess Engine 
 
 ## Prerequisites
 
@@ -12,16 +12,16 @@ Before you start, ensure you have the following installed on your system:
 1. **Clone the Repository**:
 
    ```bash
-   git clone https://github.com/ninjasatish/ChessEngine.git
-
+   git clone https://github.com/NamanOstwal/AlphaOne---Chess-Engine.git
+   cd AlphaOne---Chess-Engine
    ```
 2. **Install Pygame**:
    ```bash
    pip3 install pygame
    ```
-4. **Open Chess Engine in Code Editor (VS code)**:
+3. **Run the Chess Engine**:
    ```bash
-   python3 chessmain.py
+   python3 src/chessmain.py
    ```
 
 ## Heurestia
