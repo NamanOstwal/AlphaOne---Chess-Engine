@@ -1,5 +1,5 @@
 
-# Chess Engine 
+# AlphaOne - Chess Engine 
 
 ## Prerequisites
 
@@ -12,16 +12,16 @@ Before you start, ensure you have the following installed on your system:
 1. **Clone the Repository**:
 
    ```bash
-   git clone https://github.com/ninjasatish/ChessEngine.git
-
+   git clone https://github.com/NamanOstwal/AlphaOne---Chess-Engine.git
+   cd AlphaOne---Chess-Engine
    ```
 2. **Install Pygame**:
    ```bash
    pip3 install pygame
    ```
-4. **Open Chess Engine in Code Editor (VS code)**:
+3. **Run the Chess Engine**:
    ```bash
-   python3 chessmain.py
+   python3 src/chessmain.py
    ```
 
 ## Heurestia
@@ -42,9 +42,9 @@ OK now we know how a game tree works and how we search inside a game tree
 but the problem is in chess there's a huge role of positional scores, pawn structures, centre control, forking and pins all these parameters make a chess engine.
 how are we gonna tackle all this?
 well well we have some desired data on the internet through which we can make this possible as each piece has a different value as a material and different value on different positions of the chessboard 
-Example:  king = 0 ( you cannot capture king ), Queen = 9, Rook = 5, Bishop = 3, Knight= 3, pawn=1 [yhese al are material value ]
-positional scores: every piece on the chessboard will have a different position score on 64 blocks based on studies ex: The value 0.0 represents the lowest score, meaning the worst position for a knight. The values increase as we move towards the centre of the board, indicating better positions example: a knight placed in the centre (rows 2 to 5, columns 2 to 5) would have higher scores compared to those placed on the edges with the highest score, 0.7, is assigned to the centre-most squares (row 3, column 3 to 6) the score gradually decreases as we move away from the centre. 
-The role of these scores in the code is to help evaluate the relative strength of different positions on the board for each type of piece during the algorithm’s decision-making process, these scores are used to prioritize moves that lead to positions with higher scores 
+Example: king = 0 ( you cannot capture king ), Queen = 9, Rook = 5, Bishop = 3, Knight= 3, pawn=1 [yhese al are material value ]
+positional scores: every piece on the chessboard will have a different position score on 64 blocks based on studies ex: The value 0.0 represents the lowest score, meaning the worst position for a knight. The values increase as we move towards the centre of the board, indicating better positions example: a knight placed in the centre (rows 2 to 5, columns 2 to 5) would have higher scores compared to those placed on the edges with the highest score, 0.7, is assigned to the centre-most squares (row 3, column 3 to 6) the score gradually decreases as we move away from the centre.
+The role of these scores in the code is to help evaluate the relative strength of different positions on the board for each type of piece during the algorithm’s decision-making process, these scores are used to prioritize moves that lead to positions with higher scores
 
 ![Relative-Positional-value](/images/positional-value.jpg)
 

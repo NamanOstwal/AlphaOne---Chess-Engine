@@ -1,121 +1,143 @@
 import React from 'react';
 import { SearchStats } from '../types/chess';
-import { Cpu, Zap, Database, Clock, Layers } from 'lucide-react';
+import { Cpu, Zap, Database, Clock, Layers, Target } from 'lucide-react';
 
 interface EngineStatsProps {
   stats: SearchStats | null;
   isThinking: boolean;
-  engineName?: string;
 }
 
-export const EngineStats: React.FC<EngineStatsProps> = ({
-  stats,
-  isThinking,
-  engineName = 'AlphaOne WebAssembly'
-}) => {
+const StatTile: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  accent?: string;
+}> = ({ icon, label, value, accent }) => (
+  <div className="stat-tile">
+    <div className="stat-label">
+      {icon}
+      <span>{label}</span>
+    </div>
+    <div className="stat-value" style={{ color: accent }}>
+      {value}
+    </div>
+  </div>
+);
+
+export const EngineStats: React.FC<EngineStatsProps> = ({ stats, isThinking }) => {
   return (
-    <div className="glass-panel" style={{ padding: '20px', width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div
-            style={{
-              width: '10px',
-              height: '10px',
-              borderRadius: '50%',
-              backgroundColor: isThinking ? 'var(--accent-cyan)' : '#10b981',
-              boxShadow: isThinking ? '0 0 10px var(--accent-cyan)' : '0 0 8px #10b981',
-            }}
-            className={isThinking ? 'ai-thinking-pulse' : ''}
-          />
-          <span style={{ fontWeight: 700, fontSize: '15px', letterSpacing: '0.3px' }}>{engineName}</span>
+    <div className="card">
+      <div className="card-header">
+        <div className="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            <path d="M4.93 4.93a10 10 0 0 0 0 14.14"/>
+            <path d="M14.83 9.17a4 4 0 0 1 0 5.66"/>
+            <path d="M9.17 9.17a4 4 0 0 0 0 5.66"/>
+          </svg>
+          Engine Analysis
         </div>
-        <span
-          style={{
-            fontSize: '12px',
+
+        {/* Status badge */}
+        {isThinking ? (
+          <div className="badge badge-cyan">
+            <div className="badge-dot" style={{ animation: 'glow-pulse 1s ease-in-out infinite' }} />
+            <span>THINKING</span>
+            <div style={{ display: 'flex', gap: 3, alignItems: 'center', marginLeft: 2 }}>
+              <span className="thinking-dot" />
+              <span className="thinking-dot" />
+              <span className="thinking-dot" />
+            </div>
+          </div>
+        ) : (
+          <div className="badge badge-green">
+            <div className="badge-dot" />
+            READY
+          </div>
+        )}
+      </div>
+
+      <div className="card-body" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        <StatTile
+          icon={<Layers size={11} />}
+          label="DEPTH"
+          value={String(stats?.depth ?? '—')}
+        />
+        <StatTile
+          icon={<Cpu size={11} />}
+          label="NODES"
+          value={stats?.nodes ? (stats.nodes >= 1_000_000
+            ? `${(stats.nodes / 1_000_000).toFixed(1)}M`
+            : stats.nodes >= 1_000
+            ? `${(stats.nodes / 1_000).toFixed(0)}K`
+            : String(stats.nodes)) : '—'}
+        />
+        <StatTile
+          icon={<Zap size={11} />}
+          label="NPS"
+          value={stats?.nodesPerSecond
+            ? stats.nodesPerSecond >= 1_000_000
+              ? `${(stats.nodesPerSecond / 1_000_000).toFixed(1)}M`
+              : `${(stats.nodesPerSecond / 1_000).toFixed(0)}K`
+            : '—'}
+          accent="var(--accent-amber)"
+        />
+        <StatTile
+          icon={<Database size={11} />}
+          label="TT HITS"
+          value={stats?.ttHits ? (stats.ttHits >= 1_000
+            ? `${(stats.ttHits / 1_000).toFixed(0)}K`
+            : String(stats.ttHits)) : '—'}
+        />
+        <StatTile
+          icon={<Clock size={11} />}
+          label="TIME"
+          value={stats?.timeMs ? `${stats.timeMs}ms` : '—'}
+        />
+        <StatTile
+          icon={<Target size={11} />}
+          label="BEST"
+          value={stats?.bestMove || '—'}
+          accent="var(--accent-cyan)"
+        />
+      </div>
+
+      {/* Score meter */}
+      {stats && (
+        <div style={{ padding: '0 18px 16px' }}>
+          <div style={{
+            height: 3,
+            borderRadius: 99,
+            background: 'var(--bg-elevated)',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%',
+              width: `${Math.min(100, Math.max(0, 50 + (stats.score / 800) * 50))}%`,
+              background: stats.score > 0
+                ? 'linear-gradient(90deg, var(--accent-emerald), #34d399)'
+                : 'linear-gradient(90deg, var(--accent-rose), #fb7185)',
+              borderRadius: 99,
+              transition: 'width 0.4s ease',
+            }} />
+          </div>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginTop: 4,
+            fontSize: 10,
+            color: 'var(--text-dim)',
             fontFamily: 'var(--font-mono)',
-            padding: '3px 8px',
-            borderRadius: '6px',
-            backgroundColor: isThinking ? 'rgba(0, 242, 254, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-            color: isThinking ? 'var(--accent-cyan)' : 'var(--text-muted)',
-            fontWeight: 600,
-          }}
-        >
-          {isThinking ? 'THINKING' : 'IDLE'}
-        </span>
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '10px',
-        }}
-      >
-        {/* Depth */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '11px', marginBottom: '4px' }}>
-            <Layers size={13} />
-            <span>DEPTH</span>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {stats?.depth ?? 4}
+          }}>
+            <span>♟ Black</span>
+            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+              {stats.score > 0 ? '+' : ''}{(stats.score / 100).toFixed(2)} cp
+            </span>
+            <span>White ♙</span>
           </div>
         </div>
-
-        {/* Nodes */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '11px', marginBottom: '4px' }}>
-            <Cpu size={13} />
-            <span>NODES</span>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {stats?.nodes ? stats.nodes.toLocaleString() : '0'}
-          </div>
-        </div>
-
-        {/* NPS */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '11px', marginBottom: '4px' }}>
-            <Zap size={13} color="var(--accent-gold)" />
-            <span>NPS</span>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 700, color: 'var(--accent-gold)' }}>
-            {stats?.nodesPerSecond ? stats.nodesPerSecond.toLocaleString() : '-'}
-          </div>
-        </div>
-
-        {/* TT Hits */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '11px', marginBottom: '4px' }}>
-            <Database size={13} />
-            <span>TT HITS</span>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {stats?.ttHits ? stats.ttHits.toLocaleString() : '0'}
-          </div>
-        </div>
-
-        {/* Elapsed Time */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '11px', marginBottom: '4px' }}>
-            <Clock size={13} />
-            <span>TIME</span>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {stats?.timeMs ? `${stats.timeMs}ms` : '0ms'}
-          </div>
-        </div>
-
-        {/* Best Move */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '11px', marginBottom: '4px' }}>
-            <span>BEST MOVE</span>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 700, color: 'var(--accent-cyan)' }}>
-            {stats?.bestMove || '-'}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

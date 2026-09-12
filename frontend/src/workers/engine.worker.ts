@@ -4,11 +4,33 @@ import { EngineCommand, EngineResponse, EngineState } from '../types/chess';
 let wasmEngine: any = null;
 let isInitialized = false;
 
+interface MoveLogEntry {
+  fr: number;
+  fc: number;
+  tr: number;
+  tc: number;
+  piece: string;
+  captured: string;
+  isCastle?: boolean;
+  castleRookFr?: number;
+  castleRookFc?: number;
+  castleRookTr?: number;
+  castleRookTc?: number;
+  isEnPassant?: boolean;
+  epPawnR?: number;
+  epPawnC?: number;
+  epPawn?: string;
+  prevCastlingRights: { wK: boolean; wQ: boolean; bK: boolean; bQ: boolean };
+  prevEnPassant: string | null;
+}
+
 // Fallback pure-JS engine matching AlphaOne logic for instant resilience
 class FallbackAlphaOne {
   board: string[][];
   whiteToMove: boolean;
-  moveLog: any[];
+  moveLog: MoveLogEntry[];
+  castlingRights = { wK: true, wQ: true, bK: true, bQ: true };
+  enPassantSquare: string | null = null;
 
   // Exact Python material scores
   pieceScore: Record<string, number> = {
@@ -94,6 +116,8 @@ class FallbackAlphaOne {
     this.board = this.createInitialBoard();
     this.whiteToMove = true;
     this.moveLog = [];
+    this.castlingRights = { wK: true, wQ: true, bK: true, bQ: true };
+    this.enPassantSquare = null;
   }
 
   evaluate(): number {
@@ -122,7 +146,97 @@ class FallbackAlphaOne {
     return score;
   }
 
-  getLegalMoves(): string[] {
+  coordsToUci(r: number, c: number): string {
+    const file = String.fromCharCode('a'.charCodeAt(0) + c);
+    const rank = (8 - r).toString();
+    return file + rank;
+  }
+
+  uciToCoords(sq: string): [number, number] {
+    const c = sq.charCodeAt(0) - 'a'.charCodeAt(0);
+    const r = 8 - parseInt(sq[1], 10);
+    return [r, c];
+  }
+
+  isSquareAttacked(r: number, c: number, byColor: 'w' | 'b'): boolean {
+    // Pawn attacks: attacking pawns sit on r + 1 for white attacker, r - 1 for black attacker
+    const pawnR = byColor === 'w' ? r + 1 : r - 1;
+    for (const dc of [-1, 1]) {
+      const pc = c + dc;
+      if (pawnR >= 0 && pawnR < 8 && pc >= 0 && pc < 8) {
+        if (this.board[pawnR][pc] === byColor + 'p') return true;
+      }
+    }
+
+    // Knight attacks
+    const nOffsets = [[-2,-1], [-2,1], [-1,-2], [-1,2], [1,-2], [1,2], [2,-1], [2,1]];
+    for (const [dr, dc] of nOffsets) {
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+        if (this.board[nr][nc] === byColor + 'N') return true;
+      }
+    }
+
+    // King attacks
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const kr = r + dr, kc = c + dc;
+        if (kr >= 0 && kr < 8 && kc >= 0 && kc < 8) {
+          if (this.board[kr][kc] === byColor + 'K') return true;
+        }
+      }
+    }
+
+    // Sliding Orthogonal (Rook, Queen)
+    const ortho = [[-1,0], [1,0], [0,-1], [0,1]];
+    for (const [dr, dc] of ortho) {
+      for (let step = 1; step < 8; step++) {
+        const sr = r + dr * step, sc = c + dc * step;
+        if (sr < 0 || sr >= 8 || sc < 0 || sc >= 8) break;
+        const p = this.board[sr][sc];
+        if (p !== '--') {
+          if (p === byColor + 'R' || p === byColor + 'Q') return true;
+          break;
+        }
+      }
+    }
+
+    // Sliding Diagonal (Bishop, Queen)
+    const diag = [[-1,-1], [-1,1], [1,-1], [1,1]];
+    for (const [dr, dc] of diag) {
+      for (let step = 1; step < 8; step++) {
+        const sr = r + dr * step, sc = c + dc * step;
+        if (sr < 0 || sr >= 8 || sc < 0 || sc >= 8) break;
+        const p = this.board[sr][sc];
+        if (p !== '--') {
+          if (p === byColor + 'B' || p === byColor + 'Q') return true;
+          break;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  findKing(color: 'w' | 'b'): [number, number] {
+    const target = color + 'K';
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        if (this.board[r][c] === target) return [r, c];
+      }
+    }
+    return [-1, -1];
+  }
+
+  isCheck(color: 'w' | 'b'): boolean {
+    const [kr, kc] = this.findKing(color);
+    if (kr === -1) return false;
+    const opponent = color === 'w' ? 'b' : 'w';
+    return this.isSquareAttacked(kr, kc, opponent);
+  }
+
+  getPseudoLegalMoves(): string[] {
     const moves: string[] = [];
     const turn = this.whiteToMove ? 'w' : 'b';
 
@@ -136,9 +250,16 @@ class FallbackAlphaOne {
           if (type === 'p') {
             const dir = turn === 'w' ? -1 : 1;
             const startR = turn === 'w' ? 6 : 1;
+            const promoR = turn === 'w' ? 0 : 7;
+
             // 1 step forward
             if (this.board[r + dir]?.[c] === '--') {
-              moves.push(fromUci + this.coordsToUci(r + dir, c));
+              const toUci = this.coordsToUci(r + dir, c);
+              if (r + dir === promoR) {
+                moves.push(fromUci + toUci + 'q');
+              } else {
+                moves.push(fromUci + toUci);
+              }
               // 2 step forward
               if (r === startR && this.board[r + 2 * dir]?.[c] === '--') {
                 moves.push(fromUci + this.coordsToUci(r + 2 * dir, c));
@@ -149,8 +270,15 @@ class FallbackAlphaOne {
               const tc = c + dc;
               if (tc >= 0 && tc < 8) {
                 const target = this.board[r + dir]?.[tc];
+                const destUci = this.coordsToUci(r + dir, tc);
                 if (target && target !== '--' && target[0] !== turn) {
-                  moves.push(fromUci + this.coordsToUci(r + dir, tc));
+                  if (r + dir === promoR) {
+                    moves.push(fromUci + destUci + 'q');
+                  } else {
+                    moves.push(fromUci + destUci);
+                  }
+                } else if (this.enPassantSquare && this.enPassantSquare === destUci) {
+                  moves.push(fromUci + destUci);
                 }
               }
             }
@@ -197,6 +325,53 @@ class FallbackAlphaOne {
                 }
               }
             }
+
+            // Castling
+            if (turn === 'w') {
+              if (this.castlingRights.wK &&
+                  this.board[7][4] === 'wK' &&
+                  this.board[7][5] === '--' &&
+                  this.board[7][6] === '--' &&
+                  this.board[7][7] === 'wR' &&
+                  !this.isSquareAttacked(7, 4, 'b') &&
+                  !this.isSquareAttacked(7, 5, 'b') &&
+                  !this.isSquareAttacked(7, 6, 'b')) {
+                moves.push('e1g1');
+              }
+              if (this.castlingRights.wQ &&
+                  this.board[7][4] === 'wK' &&
+                  this.board[7][3] === '--' &&
+                  this.board[7][2] === '--' &&
+                  this.board[7][1] === '--' &&
+                  this.board[7][0] === 'wR' &&
+                  !this.isSquareAttacked(7, 4, 'b') &&
+                  !this.isSquareAttacked(7, 3, 'b') &&
+                  !this.isSquareAttacked(7, 2, 'b')) {
+                moves.push('e1c1');
+              }
+            } else {
+              if (this.castlingRights.bK &&
+                  this.board[0][4] === 'bK' &&
+                  this.board[0][5] === '--' &&
+                  this.board[0][6] === '--' &&
+                  this.board[0][7] === 'bR' &&
+                  !this.isSquareAttacked(0, 4, 'w') &&
+                  !this.isSquareAttacked(0, 5, 'w') &&
+                  !this.isSquareAttacked(0, 6, 'w')) {
+                moves.push('e8g8');
+              }
+              if (this.castlingRights.bQ &&
+                  this.board[0][4] === 'bK' &&
+                  this.board[0][3] === '--' &&
+                  this.board[0][2] === '--' &&
+                  this.board[0][1] === '--' &&
+                  this.board[0][0] === 'bR' &&
+                  !this.isSquareAttacked(0, 4, 'w') &&
+                  !this.isSquareAttacked(0, 3, 'w') &&
+                  !this.isSquareAttacked(0, 2, 'w')) {
+                moves.push('e8c8');
+              }
+            }
           }
         }
       }
@@ -204,16 +379,19 @@ class FallbackAlphaOne {
     return moves;
   }
 
-  coordsToUci(r: number, c: number): string {
-    const file = String.fromCharCode('a'.charCodeAt(0) + c);
-    const rank = (8 - r).toString();
-    return file + rank;
-  }
+  getLegalMoves(): string[] {
+    const pseudo = this.getPseudoLegalMoves();
+    const legal: string[] = [];
+    const turn = this.whiteToMove ? 'w' : 'b';
 
-  uciToCoords(sq: string): [number, number] {
-    const c = sq.charCodeAt(0) - 'a'.charCodeAt(0);
-    const r = 8 - parseInt(sq[1], 10);
-    return [r, c];
+    for (const m of pseudo) {
+      this.makeMove(m);
+      if (!this.isCheck(turn)) {
+        legal.push(m);
+      }
+      this.undoMove();
+    }
+    return legal;
   }
 
   makeMove(uci: string): boolean {
@@ -223,29 +401,174 @@ class FallbackAlphaOne {
     const [tr, tc] = this.uciToCoords(to);
 
     const piece = this.board[fr][fc];
-    const captured = this.board[tr][tc];
+    let captured = this.board[tr][tc];
 
-    this.moveLog.push({ fr, fc, tr, tc, piece, captured });
-    this.board[fr][fc] = '--';
+    const logEntry: MoveLogEntry = {
+      fr, fc, tr, tc, piece, captured,
+      prevCastlingRights: { ...this.castlingRights },
+      prevEnPassant: this.enPassantSquare,
+    };
+
+    // Castling execution
+    if (piece === 'wK' && from === 'e1' && to === 'g1') {
+      logEntry.isCastle = true;
+      logEntry.castleRookFr = 7; logEntry.castleRookFc = 7;
+      logEntry.castleRookTr = 7; logEntry.castleRookTc = 5;
+      this.board[7][5] = 'wR';
+      this.board[7][7] = '--';
+    } else if (piece === 'wK' && from === 'e1' && to === 'c1') {
+      logEntry.isCastle = true;
+      logEntry.castleRookFr = 7; logEntry.castleRookFc = 0;
+      logEntry.castleRookTr = 7; logEntry.castleRookTc = 3;
+      this.board[7][3] = 'wR';
+      this.board[7][0] = '--';
+    } else if (piece === 'bK' && from === 'e8' && to === 'g8') {
+      logEntry.isCastle = true;
+      logEntry.castleRookFr = 0; logEntry.castleRookFc = 7;
+      logEntry.castleRookTr = 0; logEntry.castleRookTc = 5;
+      this.board[0][5] = 'bR';
+      this.board[0][7] = '--';
+    } else if (piece === 'bK' && from === 'e8' && to === 'c8') {
+      logEntry.isCastle = true;
+      logEntry.castleRookFr = 0; logEntry.castleRookFc = 0;
+      logEntry.castleRookTr = 0; logEntry.castleRookTc = 3;
+      this.board[0][3] = 'bR';
+      this.board[0][0] = '--';
+    }
+
+    // En passant execution
+    if (piece[1] === 'p' && fc !== tc && captured === '--') {
+      logEntry.isEnPassant = true;
+      logEntry.epPawnR = fr;
+      logEntry.epPawnC = tc;
+      logEntry.epPawn = this.board[fr][tc];
+      this.board[fr][tc] = '--';
+    }
+
+    // Update en passant square for next move
+    if (piece[1] === 'p' && Math.abs(fr - tr) === 2) {
+      this.enPassantSquare = this.coordsToUci((fr + tr) / 2, fc);
+    } else {
+      this.enPassantSquare = null;
+    }
+
+    // Update castling rights
+    if (piece === 'wK') { this.castlingRights.wK = false; this.castlingRights.wQ = false; }
+    if (piece === 'bK') { this.castlingRights.bK = false; this.castlingRights.bQ = false; }
+    if (fr === 7 && fc === 0) this.castlingRights.wQ = false;
+    if (fr === 7 && fc === 7) this.castlingRights.wK = false;
+    if (fr === 0 && fc === 0) this.castlingRights.bQ = false;
+    if (fr === 0 && fc === 7) this.castlingRights.bK = false;
 
     // Promotion
     if (piece[1] === 'p' && (tr === 0 || tr === 7)) {
-      this.board[tr][tc] = piece[0] + 'Q';
+      const promoType = (uci[4] ? uci[4].toUpperCase() : 'Q');
+      this.board[tr][tc] = piece[0] + promoType;
     } else {
       this.board[tr][tc] = piece;
     }
 
+    this.board[fr][fc] = '--';
+    this.moveLog.push(logEntry);
     this.whiteToMove = !this.whiteToMove;
     return true;
   }
 
   undoMove(): boolean {
     if (this.moveLog.length === 0) return false;
-    const last = this.moveLog.pop();
+    const last = this.moveLog.pop()!;
+
     this.board[last.fr][last.fc] = last.piece;
     this.board[last.tr][last.tc] = last.captured;
+
+    if (last.isCastle && last.castleRookFr !== undefined) {
+      this.board[last.castleRookFr][last.castleRookFc!] = this.board[last.castleRookTr!][last.castleRookTc!];
+      this.board[last.castleRookTr!][last.castleRookTc!] = '--';
+    }
+
+    if (last.isEnPassant && last.epPawnR !== undefined) {
+      this.board[last.tr][last.tc] = '--';
+      this.board[last.epPawnR][last.epPawnC!] = last.epPawn!;
+    }
+
+    this.castlingRights = last.prevCastlingRights;
+    this.enPassantSquare = last.prevEnPassant;
     this.whiteToMove = !this.whiteToMove;
     return true;
+  }
+
+  minimax(depth: number, alpha: number, beta: number, isMaximizing: boolean): number {
+    const mover = this.whiteToMove ? 'w' : 'b';
+    const legalMoves = this.getLegalMoves();
+    const inCheck = this.isCheck(mover);
+
+    if (legalMoves.length === 0) {
+      if (inCheck) return isMaximizing ? -50000 + depth : 50000 - depth;
+      return 0; // stalemate
+    }
+
+    if (depth === 0) {
+      return this.evaluate();
+    }
+
+    if (isMaximizing) {
+      let maxEval = -999999;
+      for (const m of legalMoves) {
+        this.makeMove(m);
+        const evalScore = this.minimax(depth - 1, alpha, beta, false);
+        this.undoMove();
+        maxEval = Math.max(maxEval, evalScore);
+        alpha = Math.max(alpha, evalScore);
+        if (beta <= alpha) break;
+      }
+      return maxEval;
+    } else {
+      let minEval = 999999;
+      for (const m of legalMoves) {
+        this.makeMove(m);
+        const evalScore = this.minimax(depth - 1, alpha, beta, true);
+        this.undoMove();
+        minEval = Math.min(minEval, evalScore);
+        beta = Math.min(beta, evalScore);
+        if (beta <= alpha) break;
+      }
+      return minEval;
+    }
+  }
+
+  getBestMove(depth = 3): { bestMove: string; score: number; nodes: number } {
+    const legalMoves = this.getLegalMoves();
+    if (legalMoves.length === 0) return { bestMove: '', score: 0, nodes: 0 };
+
+    const isWhite = this.whiteToMove;
+    let bestMove = legalMoves[0];
+    let bestScore = isWhite ? -999999 : 999999;
+    let alpha = -999999;
+    let beta = 999999;
+    let nodes = 0;
+
+    for (const m of legalMoves) {
+      nodes++;
+      this.makeMove(m);
+      const score = this.minimax(depth - 1, alpha, beta, !isWhite);
+      this.undoMove();
+
+      if (isWhite) {
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = m;
+        }
+        alpha = Math.max(alpha, bestScore);
+      } else {
+        if (score < bestScore) {
+          bestScore = score;
+          bestMove = m;
+        }
+        beta = Math.min(beta, bestScore);
+      }
+    }
+
+    return { bestMove, score: bestScore, nodes };
   }
 
   getFen(): string {
@@ -268,7 +591,13 @@ class FallbackAlphaOne {
       if (empty > 0) fen += empty;
       if (r < 7) fen += '/';
     }
-    fen += this.whiteToMove ? ' w KQkq - 0 1' : ' b KQkq - 0 1';
+    const castleStr =
+      (this.castlingRights.wK ? 'K' : '') +
+      (this.castlingRights.wQ ? 'Q' : '') +
+      (this.castlingRights.bK ? 'k' : '') +
+      (this.castlingRights.bQ ? 'q' : '') || '-';
+    fen += this.whiteToMove ? ` w ${castleStr} ` : ` b ${castleStr} `;
+    fen += this.enPassantSquare ? `${this.enPassantSquare} 0 1` : '- 0 1';
     return fen;
   }
 }
@@ -323,12 +652,14 @@ function getCurrentState(): EngineState {
     };
   } else {
     const legalMoves = fallbackEngine.getLegalMoves();
+    const turn = fallbackEngine.whiteToMove ? 'w' : 'b';
+    const inCheck = fallbackEngine.isCheck(turn);
     return {
       fen: fallbackEngine.getFen(),
       isWhiteToMove: fallbackEngine.whiteToMove,
-      inCheck: false,
-      isCheckmate: legalMoves.length === 0,
-      isStalemate: false,
+      inCheck,
+      isCheckmate: inCheck && legalMoves.length === 0,
+      isStalemate: !inCheck && legalMoves.length === 0,
       legalMoves,
       evaluation: fallbackEngine.evaluate(),
       moveCount: fallbackEngine.moveLog.length
@@ -398,40 +729,18 @@ self.onmessage = async (e: MessageEvent<EngineCommand>) => {
             stats: statsJson
           } as EngineResponse);
         } else {
-          // Fallback search: pick best evaluation
-          const legalMoves = fallbackEngine.getLegalMoves();
-          let bestMove = legalMoves[0] || '';
-          let bestScore = fallbackEngine.whiteToMove ? -99999 : 99999;
-
-          for (const m of legalMoves) {
-            fallbackEngine.makeMove(m);
-            const score = fallbackEngine.evaluate();
-            fallbackEngine.undoMove();
-
-            if (fallbackEngine.whiteToMove) {
-              if (score > bestScore) {
-                bestScore = score;
-                bestMove = m;
-              }
-            } else {
-              if (score < bestScore) {
-                bestScore = score;
-                bestMove = m;
-              }
-            }
-          }
-
+          const { bestMove, score, nodes } = fallbackEngine.getBestMove(3);
           const elapsed = Math.max(1, Date.now() - startTime);
           self.postMessage({
             id: cmd.id,
             type: 'bestMove',
             bestMove,
             stats: {
-              depth: 2,
-              nodes: legalMoves.length,
-              score: bestScore,
+              depth: 3,
+              nodes,
+              score,
               timeMs: elapsed,
-              nodesPerSecond: Math.round((legalMoves.length * 1000) / elapsed),
+              nodesPerSecond: Math.round((nodes * 1000) / elapsed),
               ttHits: 0,
               bestMove
             }
