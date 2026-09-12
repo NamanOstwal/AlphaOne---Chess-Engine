@@ -1,91 +1,114 @@
 import React from 'react';
 
 interface EvaluationBarProps {
-  score: number; // in centipawns (positive = White, negative = Black)
+  score: number;
   isWhiteBottom?: boolean;
 }
 
-export const EvaluationBar: React.FC<EvaluationBarProps> = ({ score, isWhiteBottom = true }) => {
-  // Clamp score between -1000 and +1000 for display percentage
+export const EvaluationBar: React.FC<EvaluationBarProps> = ({
+  score,
+  isWhiteBottom = true,
+}) => {
   const isMate = Math.abs(score) >= 9000;
-  let formattedScore = '0.0';
 
+  let formattedScore: string;
   if (isMate) {
-    formattedScore = score > 0 ? '+M' : '-M';
+    formattedScore = score > 0 ? 'M' : 'M';
   } else {
-    const pawns = (score / 100).toFixed(1);
-    formattedScore = score > 0 ? `+${pawns}` : pawns;
+    const p = (score / 100).toFixed(1);
+    formattedScore = score > 0 ? `+${p}` : p;
   }
 
-  // Calculate percentage of White's height (0% = all Black, 100% = all White)
-  // Logistic function or linear clamp
+  // White's percentage of bar height
   let whitePercent = 50;
   if (isMate) {
     whitePercent = score > 0 ? 100 : 0;
   } else {
-    // Clamped between 5% and 95%
-    const clamped = Math.max(-800, Math.min(800, score));
-    whitePercent = 50 + (clamped / 800) * 45;
+    const clamped = Math.max(-600, Math.min(600, score));
+    whitePercent = 50 + (clamped / 600) * 44;
   }
 
-  const whiteHeight = isWhiteBottom ? `${whitePercent}%` : `${100 - whitePercent}%`;
+  const whiteHeight = isWhiteBottom
+    ? `${whitePercent}%`
+    : `${100 - whitePercent}%`;
+
+  const scoreLabelOnWhite = whitePercent > 50;
 
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        width: '32px',
-        height: 'min(80vw, 560px)',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        border: '1px solid var(--border-glass)',
-        boxShadow: 'var(--shadow-glass)',
-        backgroundColor: '#1e293b',
         position: 'relative',
+        width: 26,
+        height: 'min(90vw, 540px)',
+        borderRadius: 6,
+        overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.08)',
+        flexShrink: 0,
         userSelect: 'none',
       }}
     >
-      {/* Black's section */}
+      {/* Black section */}
       <div
         style={{
-          width: '100%',
-          flex: 1,
-          backgroundColor: '#0f172a',
-          position: 'relative',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: '#1a1a1a',
         }}
       />
 
-      {/* White's section */}
+      {/* White section — grows from bottom */}
       <div
         style={{
-          width: '100%',
-          height: whiteHeight,
-          backgroundColor: '#f8fafc',
-          boxShadow: '0 0 12px rgba(248, 250, 252, 0.4)',
-          transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
           position: 'absolute',
           bottom: 0,
           left: 0,
+          right: 0,
+          height: whiteHeight,
+          background: '#f0f0f0',
+          transition: 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: '0 -2px 8px rgba(255,255,255,0.15)',
         }}
       />
 
-      {/* Score label overlay */}
+      {/* Divider line */}
       <div
         style={{
           position: 'absolute',
-          top: whitePercent > 50 ? 'auto' : 8,
-          bottom: whitePercent > 50 ? 8 : 'auto',
-          fontSize: '10px',
+          left: 0,
+          right: 0,
+          bottom: whiteHeight,
+          height: 1.5,
+          background: 'rgba(0,0,0,0.3)',
+          zIndex: 3,
+          transition: 'bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      />
+
+      {/* Score label */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: scoreLabelOnWhite ? 'auto' : 6,
+          bottom: scoreLabelOnWhite ? 6 : 'auto',
+          textAlign: 'center',
+          fontSize: 9,
           fontWeight: 800,
           fontFamily: 'var(--font-mono)',
-          color: whitePercent > 50 ? '#0f172a' : '#f8fafc',
-          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-          zIndex: 3,
+          color: scoreLabelOnWhite ? '#1a1a1a' : '#f0f0f0',
+          zIndex: 4,
+          letterSpacing: '-0.02em',
+          lineHeight: 1.1,
+          transition: 'all 0.4s ease',
+          padding: '0 1px',
+          whiteSpace: 'pre',
         }}
       >
-        {formattedScore}
+        {isMate ? (score > 0 ? '+M' : '−M') : formattedScore}
       </div>
     </div>
   );
