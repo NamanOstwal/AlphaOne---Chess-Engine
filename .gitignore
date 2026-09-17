@@ -11,3 +11,5 @@ frontend/dist/
 frontend/public/wasm/*.wasm
 frontend/public/wasm/*.js
 !frontend/public/wasm/.gitkeep
+.vite/
+frontend/.vite/
