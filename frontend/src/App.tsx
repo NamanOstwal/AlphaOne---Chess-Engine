@@ -8,7 +8,7 @@ import { CapturedPieces } from './components/CapturedPieces';
 import { RobotHero } from './components/RobotHero';
 import { engineService } from './services/EngineService';
 import { EngineState, SearchStats } from './types/chess';
-import { toggleSound, isSoundEnabled } from './utils/audio';
+import { toggleSound, playMoveSound } from './utils/audio';
 import {
   Volume2,
   VolumeX,
@@ -76,6 +76,7 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // AI Move Execution with sound feedback
   const triggerAiMove = useCallback(async () => {
     if (thinkingRef.current) return;
     const cur = stateRef.current;
@@ -88,6 +89,10 @@ export const App: React.FC = () => {
         setStats(res.stats);
         setLastMove(res.bestMove);
         setMovesHistory((prev) => [...prev, res.bestMove]);
+
+        // Play audio for AI move
+        playMoveSound(false, cur.inCheck);
+
         await engineService.makeMove(res.bestMove);
       }
     } catch (err) {
@@ -97,6 +102,7 @@ export const App: React.FC = () => {
     }
   }, [searchDepth]);
 
+  // Turn management
   useEffect(() => {
     if (isThinking) return;
     if (engineState.isCheckmate || engineState.isStalemate) return;
@@ -107,7 +113,7 @@ export const App: React.FC = () => {
       playerColor === 'ai';
 
     if (isAiTurn) {
-      const delay = playerColor === 'ai' ? 500 : 250;
+      const delay = playerColor === 'ai' ? 450 : 250;
       const t = setTimeout(() => triggerAiMove(), delay);
       return () => clearTimeout(t);
     }
@@ -120,6 +126,7 @@ export const App: React.FC = () => {
     triggerAiMove,
   ]);
 
+  // Human Move Execution
   const handleMakeMove = useCallback(async (uci: string) => {
     if (isThinking) return;
 
@@ -192,8 +199,8 @@ export const App: React.FC = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '24px 36px',
-          background: 'linear-gradient(to bottom, rgba(14,15,18,0.75) 0%, rgba(14,15,18,0) 100%)',
+          padding: '22px 36px',
+          background: 'linear-gradient(to bottom, rgba(10,11,14,0.75) 0%, rgba(10,11,14,0) 100%)',
           backdropFilter: 'blur(8px)',
         }}
       >
@@ -204,7 +211,7 @@ export const App: React.FC = () => {
               fontWeight: 800,
               fontSize: 18,
               letterSpacing: '-0.03em',
-              color: '#111',
+              color: '#0e0f13',
               mixBlendMode: 'difference',
             }}
           >
@@ -219,7 +226,7 @@ export const App: React.FC = () => {
               textTransform: 'uppercase',
             }}
           >
-            C++ / WASM v1.0
+            C++17 / WASM
           </span>
         </div>
 
@@ -231,11 +238,12 @@ export const App: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#111',
+            color: '#0e0f13',
             mixBlendMode: 'difference',
             cursor: 'pointer',
           }}
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          title="AlphaOne"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="9" />
@@ -250,7 +258,7 @@ export const App: React.FC = () => {
             style={{
               background: 'none',
               border: 'none',
-              color: '#222',
+              color: '#111',
               fontFamily: 'var(--font-sans)',
               fontSize: 14,
               fontWeight: 600,
@@ -261,13 +269,7 @@ export const App: React.FC = () => {
           >
             Capabilities
           </button>
-          <button
-            onClick={scrollToArena}
-            className="loco-pill"
-            style={{
-              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            }}
-          >
+          <button onClick={scrollToArena} className="loco-pill">
             <span>Play Engine</span>
             <ArrowRight size={14} />
           </button>
@@ -275,7 +277,7 @@ export const App: React.FC = () => {
       </header>
 
       {/* ====================================================================
-          2. HERO SECTION — REPLICATING LISA.LOCOMOTIVE.CA/EN
+          2. HERO SECTION (Locomotive Lisa Inspired 3D Studio)
           ==================================================================== */}
       <section
         id="hero-section"
@@ -286,17 +288,17 @@ export const App: React.FC = () => {
           minHeight: 700,
           display: 'flex',
           alignItems: 'center',
-          background: 'radial-gradient(ellipse at 50% 36%, #e8e8ea 0%, #cacace 45%, #9c9da3 100%)',
+          background: 'radial-gradient(ellipse at 50% 36%, #eaebee 0%, #c8c9ce 45%, #97989f 100%)',
           overflow: 'hidden',
           padding: '0 48px',
         }}
       >
-        {/* Ambient Subtle Studio Shadow Vignette */}
+        {/* Studio Lighting Vignette */}
         <div
           style={{
             position: 'absolute',
             inset: 0,
-            background: 'radial-gradient(circle at 50% 90%, rgba(0,0,0,0.35) 0%, transparent 60%)',
+            background: 'radial-gradient(circle at 50% 90%, rgba(0,0,0,0.35) 0%, transparent 65%)',
             pointerEvents: 'none',
           }}
         />
@@ -306,10 +308,10 @@ export const App: React.FC = () => {
           style={{
             position: 'relative',
             zIndex: 10,
-            maxWidth: 580,
+            maxWidth: 620,
             display: 'flex',
             flexDirection: 'column',
-            gap: 24,
+            gap: 22,
             paddingBottom: 40,
           }}
         >
@@ -319,7 +321,7 @@ export const App: React.FC = () => {
               style={{
                 fontFamily: 'var(--font-sans)',
                 fontSize: 14,
-                color: '#555760',
+                color: '#50525b',
                 lineHeight: 1.5,
                 fontWeight: 500,
               }}
@@ -330,7 +332,7 @@ export const App: React.FC = () => {
             </p>
           </div>
 
-          {/* Main Title (Exact User Requirement with Blinking Cursor) */}
+          {/* Main Title (Corrected Spelling & Formatting) */}
           <h1
             style={{
               fontFamily: 'var(--font-display)',
@@ -341,15 +343,15 @@ export const App: React.FC = () => {
               color: '#0e0f13',
             }}
           >
-            AlphaOne - Low Latency Chess Engine devloped using C++ wth elo ~1500.
+            AlphaOne — Low Latency Chess Engine developed using C++ with ELO ~1500.
             <span className="blinking-cursor">▌</span>
           </h1>
 
-          {/* Interactive Filter / Capability Pills */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 6 }}>
+          {/* Interactive Capability Pills */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
             <button onClick={scrollToArena} className="loco-pill">
               <Sparkles size={13} />
-              Start a Game
+              Launch Arena
             </button>
             <button onClick={scrollToCapabilities} className="loco-pill">
               <Zap size={13} />
@@ -385,7 +387,7 @@ export const App: React.FC = () => {
           <RobotHero />
         </div>
 
-        {/* Bottom Floating Action Buttons */}
+        {/* Bottom Left: Reset / Interactive Hint */}
         <div
           style={{
             position: 'absolute',
@@ -397,7 +399,6 @@ export const App: React.FC = () => {
             gap: 12,
           }}
         >
-          {/* Reset / Reload icon button */}
           <button
             onClick={() => window.location.reload()}
             title="Reload Experience"
@@ -425,7 +426,7 @@ export const App: React.FC = () => {
             style={{
               fontSize: 12,
               fontFamily: 'var(--font-mono)',
-              color: '#44464f',
+              color: '#383a42',
               fontWeight: 500,
             }}
           >
@@ -433,7 +434,7 @@ export const App: React.FC = () => {
           </span>
         </div>
 
-        {/* Bottom Right: Sound Toggle Pill */}
+        {/* Bottom Right: Audio Toggle Pill */}
         <div
           style={{
             position: 'absolute',
@@ -452,7 +453,7 @@ export const App: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              padding: '8px 16px',
+              padding: '8px 18px',
               borderRadius: 9999,
               backgroundColor: '#0e0f13',
               color: '#fff',
@@ -470,7 +471,7 @@ export const App: React.FC = () => {
           </button>
         </div>
 
-        {/* Scroll down indicator */}
+        {/* Scroll Cue Indicator */}
         <div
           onClick={scrollToCapabilities}
           style={{
@@ -484,16 +485,14 @@ export const App: React.FC = () => {
             alignItems: 'center',
             gap: 4,
             cursor: 'pointer',
-            opacity: 0.75,
+            opacity: 0.8,
             transition: 'opacity 0.2s ease',
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.75')}
         >
-          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#333' }}>
+          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#25262c', fontWeight: 600 }}>
             SCROLL TO EXPLORE
           </span>
-          <ChevronDown size={16} color="#333" className="pulse-soft" />
+          <ChevronDown size={16} color="#25262c" className="pulse-soft" />
         </div>
       </section>
 
@@ -511,7 +510,6 @@ export const App: React.FC = () => {
           gap: 60,
         }}
       >
-        {/* Header */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <span
             style={{
@@ -549,7 +547,6 @@ export const App: React.FC = () => {
             gap: 20,
           }}
         >
-          {/* Card 1 */}
           <div className="studio-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <div
@@ -576,7 +573,6 @@ export const App: React.FC = () => {
             </p>
           </div>
 
-          {/* Card 2 */}
           <div className="studio-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <div
@@ -603,7 +599,6 @@ export const App: React.FC = () => {
             </p>
           </div>
 
-          {/* Card 3 */}
           <div className="studio-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <div
@@ -630,7 +625,6 @@ export const App: React.FC = () => {
             </p>
           </div>
 
-          {/* Card 4 */}
           <div className="studio-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <div
@@ -657,7 +651,6 @@ export const App: React.FC = () => {
             </p>
           </div>
 
-          {/* Card 5 */}
           <div className="studio-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <div
@@ -684,7 +677,6 @@ export const App: React.FC = () => {
             </p>
           </div>
 
-          {/* Card 6 */}
           <div className="studio-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <div
@@ -719,12 +711,12 @@ export const App: React.FC = () => {
       <section
         id="arena-section"
         style={{
-          padding: '100px 48px 140px',
-          maxWidth: 1360,
+          padding: '80px 36px 140px',
+          maxWidth: 1320,
           margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: 40,
+          gap: 36,
         }}
       >
         {/* Section Header */}
@@ -743,7 +735,7 @@ export const App: React.FC = () => {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(28px, 3.4vw, 44px)',
+                fontSize: 'clamp(28px, 3.4vw, 42px)',
                 fontWeight: 700,
                 letterSpacing: '-0.03em',
                 color: '#fff',
@@ -765,17 +757,26 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Main Chess Arena Grid */}
+        {/* Main Chess Arena Grid (Balanced 2-Column Boxing) */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'auto 1fr',
-            gap: 36,
+            gridTemplateColumns: 'minmax(0, 1.15fr) minmax(360px, 0.85fr)',
+            gap: 28,
             alignItems: 'start',
           }}
         >
-          {/* Left Column: Evaluation Bar + Chessboard + Captured Tray */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Left Column: Board Container Box */}
+          <div
+            className="card"
+            style={{
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              backgroundColor: 'var(--bg-card)',
+            }}
+          >
             {/* Top Opponent Player Badge */}
             <div
               style={{
@@ -783,18 +784,18 @@ export const App: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '10px 16px',
-                borderRadius: 12,
+                borderRadius: 10,
                 background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div
                   style={{
-                    width: 32,
-                    height: 32,
+                    width: 34,
+                    height: 34,
                     borderRadius: 8,
-                    background: '#22252e',
+                    background: '#1d1f26',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -815,8 +816,15 @@ export const App: React.FC = () => {
               <CapturedPieces fen={engineState.fen} />
             </div>
 
-            {/* Board + Evaluation Bar */}
-            <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+            {/* Board + Integrated Evaluation Bar */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 12,
+                alignItems: 'stretch',
+                justifyContent: 'center',
+              }}
+            >
               <EvaluationBar score={engineState.evaluation} isWhiteBottom={!isFlipped} />
               <Chessboard
                 fen={engineState.fen}
@@ -842,18 +850,18 @@ export const App: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '10px 16px',
-                borderRadius: 12,
+                borderRadius: 10,
                 background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div
                   style={{
-                    width: 32,
-                    height: 32,
+                    width: 34,
+                    height: 34,
                     borderRadius: 8,
-                    background: '#f2f2f4',
+                    background: '#f2f3f5',
                     color: '#111',
                     display: 'flex',
                     alignItems: 'center',
@@ -872,22 +880,22 @@ export const App: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: '#aaa' }}>
+              <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: '#888' }}>
                 Move #{movesHistory.length}
               </div>
             </div>
 
-            {/* Checkmate / Stalemate Alert */}
+            {/* Game Alerts */}
             {engineState.isCheckmate && (
               <div
                 style={{
-                  padding: '14px 20px',
-                  borderRadius: 12,
+                  padding: '12px 18px',
+                  borderRadius: 10,
                   backgroundColor: 'rgba(239, 68, 68, 0.15)',
                   border: '1px solid rgba(239, 68, 68, 0.4)',
                   color: '#fff',
                   fontWeight: 700,
-                  fontSize: 14,
+                  fontSize: 13,
                   textAlign: 'center',
                 }}
               >
@@ -897,13 +905,13 @@ export const App: React.FC = () => {
             {engineState.isStalemate && (
               <div
                 style={{
-                  padding: '14px 20px',
-                  borderRadius: 12,
+                  padding: '12px 18px',
+                  borderRadius: 10,
                   backgroundColor: 'rgba(245, 158, 11, 0.15)',
                   border: '1px solid rgba(245, 158, 11, 0.4)',
                   color: '#fff',
                   fontWeight: 700,
-                  fontSize: 14,
+                  fontSize: 13,
                   textAlign: 'center',
                 }}
               >
@@ -912,7 +920,7 @@ export const App: React.FC = () => {
             )}
           </div>
 
-          {/* Right Column: Engine Stats + Controls + Move Log */}
+          {/* Right Column: Engine Console Boxes */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <EngineStats stats={stats} isThinking={isThinking} />
 

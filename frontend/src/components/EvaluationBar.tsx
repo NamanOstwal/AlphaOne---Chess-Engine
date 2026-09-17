@@ -13,13 +13,13 @@ export const EvaluationBar: React.FC<EvaluationBarProps> = ({
 
   let formattedScore: string;
   if (isMate) {
-    formattedScore = score > 0 ? 'M' : 'M';
+    formattedScore = score > 0 ? '+M' : '−M';
   } else {
     const p = (score / 100).toFixed(1);
     formattedScore = score > 0 ? `+${p}` : p;
   }
 
-  // White's percentage of bar height
+  // White's percentage of bar height (0 to 100)
   let whitePercent = 50;
   if (isMate) {
     whitePercent = score > 0 ? 100 : 0;
@@ -32,22 +32,25 @@ export const EvaluationBar: React.FC<EvaluationBarProps> = ({
     ? `${whitePercent}%`
     : `${100 - whitePercent}%`;
 
-  const scoreLabelOnWhite = whitePercent > 50;
+  const scoreLabelOnWhite = isWhiteBottom ? whitePercent > 50 : whitePercent < 50;
 
   return (
     <div
       style={{
         position: 'relative',
-        width: 26,
-        height: 'min(90vw, 540px)',
-        borderRadius: 6,
+        width: 22,
+        height: '100%',
+        minHeight: 480,
+        borderRadius: 8,
         overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        backgroundColor: '#16181d',
         flexShrink: 0,
         userSelect: 'none',
+        boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)',
       }}
     >
-      {/* Black section */}
+      {/* Black Section */}
       <div
         style={{
           position: 'absolute',
@@ -55,11 +58,11 @@ export const EvaluationBar: React.FC<EvaluationBarProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          background: '#1a1a1a',
+          background: 'linear-gradient(to bottom, #111215, #1f2127)',
         }}
       />
 
-      {/* White section — grows from bottom */}
+      {/* White Section (Grows from bottom) */}
       <div
         style={{
           position: 'absolute',
@@ -67,48 +70,46 @@ export const EvaluationBar: React.FC<EvaluationBarProps> = ({
           left: 0,
           right: 0,
           height: whiteHeight,
-          background: '#f0f0f0',
-          transition: 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 -2px 8px rgba(255,255,255,0.15)',
+          background: 'linear-gradient(to top, #ffffff, #dcdfe6)',
+          transition: 'height 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
+          boxShadow: '0 -2px 10px rgba(255,255,255,0.2)',
         }}
       />
 
-      {/* Divider line */}
+      {/* Center 0.0 Equilibrium Tick Mark */}
       <div
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
-          bottom: whiteHeight,
-          height: 1.5,
-          background: 'rgba(0,0,0,0.3)',
-          zIndex: 3,
-          transition: 'bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          top: '50%',
+          height: 1,
+          background: 'rgba(255, 255, 255, 0.25)',
+          zIndex: 2,
+          pointerEvents: 'none',
         }}
       />
 
-      {/* Score label */}
+      {/* Score Label Badge */}
       <div
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
-          top: scoreLabelOnWhite ? 'auto' : 6,
-          bottom: scoreLabelOnWhite ? 6 : 'auto',
+          top: scoreLabelOnWhite ? 'auto' : 8,
+          bottom: scoreLabelOnWhite ? 8 : 'auto',
           textAlign: 'center',
-          fontSize: 9,
+          fontSize: 10,
           fontWeight: 800,
           fontFamily: 'var(--font-mono)',
-          color: scoreLabelOnWhite ? '#1a1a1a' : '#f0f0f0',
+          color: scoreLabelOnWhite ? '#111215' : '#ffffff',
           zIndex: 4,
           letterSpacing: '-0.02em',
-          lineHeight: 1.1,
-          transition: 'all 0.4s ease',
-          padding: '0 1px',
-          whiteSpace: 'pre',
+          transition: 'all 0.35s ease',
+          lineHeight: 1,
         }}
       >
-        {isMate ? (score > 0 ? '+M' : '−M') : formattedScore}
+        {formattedScore}
       </div>
     </div>
   );

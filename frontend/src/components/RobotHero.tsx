@@ -9,13 +9,15 @@ export const RobotHero: React.FC = () => {
     if (!container) return;
 
     let width = container.clientWidth || window.innerWidth;
-    let height = container.clientHeight || 600;
+    let height = container.clientHeight || 650;
 
-    // Scene & Camera
+    // ─────────────────────────────────────────────────────────────
+    // 1. Scene & Camera Setup
+    // ─────────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
 
-    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-    camera.position.set(0, 0.35, 3.8);
+    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 100);
+    camera.position.set(0, 0.38, 3.9);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
@@ -23,167 +25,217 @@ export const RobotHero: React.FC = () => {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.15;
     container.appendChild(renderer.domElement);
 
-    // Studio Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    // ─────────────────────────────────────────────────────────────
+    // 2. High-End Studio Lighting Rig
+    // ─────────────────────────────────────────────────────────────
+    const ambientLight = new THREE.AmbientLight(0xf5f6fa, 1.1);
     scene.add(ambientLight);
 
     // Key Light (warm studio spotlight from top-right)
-    const keyLight = new THREE.DirectionalLight(0xfff6ec, 1.8);
-    keyLight.position.set(2.5, 4, 3);
+    const keyLight = new THREE.DirectionalLight(0xfff5eb, 2.2);
+    keyLight.position.set(3, 4.5, 3.2);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 1024;
     keyLight.shadow.mapSize.height = 1024;
-    keyLight.shadow.bias = -0.001;
+    keyLight.shadow.bias = -0.0008;
     scene.add(keyLight);
 
-    // Fill Light (cool soft light from left)
-    const fillLight = new THREE.DirectionalLight(0xdde5ed, 1.1);
-    fillLight.position.set(-3, 2, 2.5);
+    // Fill Light (soft cool light from left)
+    const fillLight = new THREE.DirectionalLight(0xdbe4ee, 1.2);
+    fillLight.position.set(-3.5, 2.5, 2.5);
     scene.add(fillLight);
 
-    // Rim / Backlight (creates crisp silhouette separation)
-    const rimLight = new THREE.DirectionalLight(0xffffff, 1.4);
-    rimLight.position.set(0, 3, -3);
+    // Top Rim Light (defines silhouette)
+    const rimLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    rimLight.position.set(0, 4, -3);
     scene.add(rimLight);
 
-    // Master Group
+    // Bottom Bounce Light (soft bounce on underside of chin)
+    const bounceLight = new THREE.DirectionalLight(0xb0b5c0, 0.6);
+    bounceLight.position.set(0, -3, 2);
+    scene.add(bounceLight);
+
+    // Master Character Group
     const characterGroup = new THREE.Group();
-    characterGroup.position.set(0, -0.65, 0);
+    characterGroup.position.set(0, -0.68, 0);
     scene.add(characterGroup);
 
     // ─────────────────────────────────────────────────────────────
-    // 1. Humanoid Body with Ribbed Turtleneck Sweater
+    // 3. Humanoid Body with Ribbed Turtleneck Sweater
     // ─────────────────────────────────────────────────────────────
     const turtleneckMat = new THREE.MeshStandardMaterial({
-      color: 0x9fa1a8,
-      roughness: 0.88,
-      metalness: 0.05,
+      color: 0x989ba3,
+      roughness: 0.9,
+      metalness: 0.04,
     });
 
-    // Shoulders / Torso
-    const torsoGeo = new THREE.CylinderGeometry(0.7, 0.92, 1.3, 36);
-    torsoGeo.scale(1.35, 1, 0.75);
+    // Torso / Shoulders with natural anatomical slope
+    const torsoGeo = new THREE.CylinderGeometry(0.72, 0.98, 1.35, 48);
+    torsoGeo.scale(1.4, 1, 0.78);
     const torsoMesh = new THREE.Mesh(torsoGeo, turtleneckMat);
-    torsoMesh.position.set(0, -0.65, 0);
+    torsoMesh.position.set(0, -0.68, 0);
     torsoMesh.receiveShadow = true;
+    torsoMesh.castShadow = true;
     characterGroup.add(torsoMesh);
 
-    // Turtleneck Collar (ribbed high-neck cylinder)
-    const neckCollarGeo = new THREE.CylinderGeometry(0.35, 0.38, 0.45, 32);
+    // Ribbed Turtleneck Collar (tall folded neck)
+    const collarGroup = new THREE.Group();
+    collarGroup.position.set(0, 0.15, 0);
+    characterGroup.add(collarGroup);
+
+    const neckCollarGeo = new THREE.CylinderGeometry(0.35, 0.38, 0.48, 36);
     const neckCollarMesh = new THREE.Mesh(neckCollarGeo, turtleneckMat);
-    neckCollarMesh.position.set(0, 0.12, 0);
     neckCollarMesh.castShadow = true;
-    characterGroup.add(neckCollarMesh);
+    collarGroup.add(neckCollarMesh);
 
-    // Turtleneck fold rim
-    const collarRimGeo = new THREE.TorusGeometry(0.36, 0.06, 16, 36);
-    collarRimGeo.rotateX(Math.PI / 2);
-    const collarRimMesh = new THREE.Mesh(collarRimGeo, turtleneckMat);
-    collarRimMesh.position.set(0, 0.3, 0);
-    characterGroup.add(collarRimMesh);
+    // Ribbed knit ring bands
+    for (let i = 0; i < 4; i++) {
+      const ringGeo = new THREE.TorusGeometry(0.355 + i * 0.005, 0.035, 12, 36);
+      ringGeo.rotateX(Math.PI / 2);
+      const ringMesh = new THREE.Mesh(ringGeo, turtleneckMat);
+      ringMesh.position.set(0, -0.15 + i * 0.1, 0);
+      collarGroup.add(ringMesh);
+    }
 
-    // Biomechanical Neck joint
+    // Top Collar Fold Overhang
+    const foldGeo = new THREE.TorusGeometry(0.37, 0.065, 16, 40);
+    foldGeo.rotateX(Math.PI / 2);
+    const foldMesh = new THREE.Mesh(foldGeo, turtleneckMat);
+    foldMesh.position.set(0, 0.22, 0);
+    collarGroup.add(foldMesh);
+
+    // Articulated Biomechanical Neck Cylinder
     const neckInnerMat = new THREE.MeshStandardMaterial({
-      color: 0x22242a,
-      roughness: 0.4,
-      metalness: 0.7,
+      color: 0x1c1e24,
+      roughness: 0.25,
+      metalness: 0.85,
     });
-    const neckInnerGeo = new THREE.CylinderGeometry(0.2, 0.22, 0.25, 24);
+    const neckInnerGeo = new THREE.CylinderGeometry(0.18, 0.21, 0.32, 28);
     const neckInnerMesh = new THREE.Mesh(neckInnerGeo, neckInnerMat);
-    neckInnerMesh.position.set(0, 0.35, 0);
+    neckInnerMesh.position.set(0, 0.36, 0);
     characterGroup.add(neckInnerMesh);
 
     // ─────────────────────────────────────────────────────────────
-    // 2. Head Pivot & Vintage CRT Monitor Head
+    // 4. Vintage Modern CRT Monitor Head Assembly
     // ─────────────────────────────────────────────────────────────
     const headGroup = new THREE.Group();
-    headGroup.position.set(0, 0.75, 0);
+    headGroup.position.set(0, 0.78, 0);
     characterGroup.add(headGroup);
 
     // Monitor Outer Casing (Rounded Chamfer Box)
     const monitorMat = new THREE.MeshStandardMaterial({
-      color: 0x2a2d34,
-      roughness: 0.42,
+      color: 0x25272e,
+      roughness: 0.38,
       metalness: 0.35,
     });
 
-    const casingGeo = new THREE.BoxGeometry(1.2, 1.05, 0.95, 4, 4, 4);
+    const casingGeo = new THREE.BoxGeometry(1.28, 1.12, 1.02, 6, 6, 6);
     const casingMesh = new THREE.Mesh(casingGeo, monitorMat);
     casingMesh.castShadow = true;
     casingMesh.receiveShadow = true;
     headGroup.add(casingMesh);
 
-    // Front Bezel Frame
-    const bezelMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1c22,
-      roughness: 0.6,
-      metalness: 0.4,
-    });
-    const bezelGeo = new THREE.BoxGeometry(1.1, 0.95, 0.1);
-    const bezelMesh = new THREE.Mesh(bezelGeo, bezelMat);
-    bezelMesh.position.set(0, 0.02, 0.46);
-    headGroup.add(bezelMesh);
-
-    // CRT Screen Glass (Convex curved dark glass)
-    const screenMat = new THREE.MeshPhysicalMaterial({
-      color: 0x0a0c10,
-      roughness: 0.15,
-      metalness: 0.1,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.15,
-    });
-    const screenGeo = new THREE.BoxGeometry(0.92, 0.76, 0.05);
-    const screenMesh = new THREE.Mesh(screenGeo, screenMat);
-    screenMesh.position.set(0, 0.05, 0.5);
-    headGroup.add(screenMesh);
-
-    // Front Control Dials / Knobs
-    const knobMat = new THREE.MeshStandardMaterial({
-      color: 0x484b55,
-      roughness: 0.3,
+    // Front Silver Bezel Accent Frame (Locomotive Lisa signature border)
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0x6e727c,
+      roughness: 0.25,
       metalness: 0.8,
     });
-    for (let i = 0; i < 4; i++) {
-      const knobGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.03, 16);
-      knobGeo.rotateX(Math.PI / 2);
-      const knobMesh = new THREE.Mesh(knobGeo, knobMat);
-      knobMesh.position.set(0.2 + i * 0.07, -0.38, 0.5);
-      headGroup.add(knobMesh);
+    const frameGeo = new THREE.BoxGeometry(1.22, 1.06, 0.08);
+    const frameMesh = new THREE.Mesh(frameGeo, frameMat);
+    frameMesh.position.set(0, 0.01, 0.49);
+    headGroup.add(frameMesh);
+
+    // Inset Front Screen Bezel (Dark Matte Charcoal)
+    const bezelMat = new THREE.MeshStandardMaterial({
+      color: 0x14151a,
+      roughness: 0.55,
+      metalness: 0.2,
+    });
+    const bezelGeo = new THREE.BoxGeometry(1.14, 0.98, 0.06);
+    const bezelMesh = new THREE.Mesh(bezelGeo, bezelMat);
+    bezelMesh.position.set(0, 0.02, 0.52);
+    headGroup.add(bezelMesh);
+
+    // Convex CRT Glass Screen (Deep glossy glass with specular reflection)
+    const screenMat = new THREE.MeshPhysicalMaterial({
+      color: 0x08090d,
+      roughness: 0.1,
+      metalness: 0.15,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.1,
+    });
+    const screenGeo = new THREE.BoxGeometry(0.96, 0.78, 0.04);
+    const screenMesh = new THREE.Mesh(screenGeo, screenMat);
+    screenMesh.position.set(0, 0.06, 0.55);
+    headGroup.add(screenMesh);
+
+    // Lower Front Panel Controls (Row of round vent / LED dots)
+    const ledMat = new THREE.MeshStandardMaterial({
+      color: 0x5a5d68,
+      roughness: 0.3,
+      metalness: 0.7,
+    });
+    for (let i = 0; i < 6; i++) {
+      const dotGeo = new THREE.CylinderGeometry(0.014, 0.014, 0.02, 16);
+      dotGeo.rotateX(Math.PI / 2);
+      const dotMesh = new THREE.Mesh(dotGeo, ledMat);
+      dotMesh.position.set(0.12 + i * 0.05, -0.38, 0.55);
+      headGroup.add(dotMesh);
     }
 
+    // Rotary dial knob on left of control panel
+    const dialMat = new THREE.MeshStandardMaterial({
+      color: 0x3d4048,
+      roughness: 0.2,
+      metalness: 0.9,
+    });
+    const dialGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.035, 20);
+    dialGeo.rotateX(Math.PI / 2);
+    const dialMesh = new THREE.Mesh(dialGeo, dialMat);
+    dialMesh.position.set(-0.35, -0.38, 0.55);
+    headGroup.add(dialMesh);
+
     // ─────────────────────────────────────────────────────────────
-    // 3. Glowing Phosphor CRT Eyes (Matching LISA / Locomotive reference)
+    // 5. Signature Glowing Phosphor CRT Eyes (LISA Style)
     // ─────────────────────────────────────────────────────────────
     const eyesGroup = new THREE.Group();
-    eyesGroup.position.set(0, 0.07, 0.53);
+    eyesGroup.position.set(0, 0.08, 0.58);
     headGroup.add(eyesGroup);
 
     // Custom Canvas Texture with bright round phosphor glow & scanlines
     const createEyeTexture = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = 128;
-      canvas.height = 128;
+      canvas.width = 256;
+      canvas.height = 256;
       const ctx = canvas.getContext('2d')!;
 
-      // Outer halo
-      const grad = ctx.createRadialGradient(64, 64, 10, 64, 64, 60);
+      // Glowing circular core with soft diffuse halo
+      const grad = ctx.createRadialGradient(128, 128, 16, 128, 128, 118);
       grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      grad.addColorStop(0.3, 'rgba(245, 240, 230, 0.95)');
-      grad.addColorStop(0.65, 'rgba(230, 220, 200, 0.45)');
-      grad.addColorStop(1, 'rgba(200, 190, 180, 0)');
+      grad.addColorStop(0.25, 'rgba(255, 250, 235, 0.98)');
+      grad.addColorStop(0.55, 'rgba(240, 225, 200, 0.65)');
+      grad.addColorStop(0.85, 'rgba(220, 200, 175, 0.2)');
+      grad.addColorStop(1, 'rgba(200, 180, 150, 0)');
 
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(64, 64, 60, 0, Math.PI * 2);
+      ctx.arc(128, 128, 118, 0, Math.PI * 2);
       ctx.fill();
 
-      // Scanline overlay pattern
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-      for (let y = 0; y < 128; y += 4) {
-        ctx.fillRect(0, y, 128, 2);
+      // CRT Scanline raster effect
+      ctx.fillStyle = 'rgba(10, 12, 16, 0.18)';
+      for (let y = 0; y < 256; y += 5) {
+        ctx.fillRect(0, y, 256, 2);
+      }
+
+      // Subtle phosphor mesh texture
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+      for (let x = 0; x < 256; x += 6) {
+        ctx.fillRect(x, 0, 2, 256);
       }
 
       const tex = new THREE.CanvasTexture(canvas);
@@ -198,61 +250,94 @@ export const RobotHero: React.FC = () => {
       depthWrite: false,
     });
 
-    const eyeGeo = new THREE.PlaneGeometry(0.24, 0.24);
+    const eyeGeo = new THREE.PlaneGeometry(0.3, 0.3);
 
     // Left Eye
     const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-    leftEye.position.set(-0.2, 0, 0);
+    leftEye.position.set(-0.22, 0, 0);
     eyesGroup.add(leftEye);
 
     // Right Eye
     const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-    rightEye.position.set(0.2, 0, 0);
+    rightEye.position.set(0.22, 0, 0);
     eyesGroup.add(rightEye);
 
-    // Subtle internal screen glow light
-    const screenLight = new THREE.PointLight(0xffeedd, 1.2, 1.5);
-    screenLight.position.set(0, 0.1, 0.7);
-    headGroup.add(screenLight);
+    // Soft Point Light emitted from eyes onto face frame
+    const screenGlowLight = new THREE.PointLight(0xfff0dd, 1.6, 1.8);
+    screenGlowLight.position.set(0, 0.1, 0.85);
+    headGroup.add(screenGlowLight);
 
     // ─────────────────────────────────────────────────────────────
-    // 4. Dangling Cable Wires (Drooping into the collar)
+    // 6. Side Audio Jacks & Dangling Patch Cables
     // ─────────────────────────────────────────────────────────────
     const cableMat = new THREE.MeshStandardMaterial({
-      color: 0x111113,
-      roughness: 0.9,
+      color: 0x111216,
+      roughness: 0.85,
       metalness: 0.1,
     });
 
-    const createCable = (startX: number, startY: number, startZ: number, endX: number, endY: number, endZ: number) => {
-      const midX = (startX + endX) * 0.5 + (Math.random() - 0.5) * 0.08;
-      const midY = (startY + endY) * 0.5 - 0.15; // droop
-      const midZ = (startZ + endZ) * 0.5 + 0.05;
+    const jackMat = new THREE.MeshStandardMaterial({
+      color: 0x858994,
+      roughness: 0.2,
+      metalness: 0.9,
+    });
 
-      const curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(startX, startY, startZ),
-        new THREE.Vector3(midX, midY, midZ),
-        new THREE.Vector3(endX, endY, endZ),
-      ]);
+    const createJack = (x: number, y: number, z: number, rotY: number) => {
+      const jackGeo = new THREE.CylinderGeometry(0.024, 0.024, 0.05, 16);
+      jackGeo.rotateZ(Math.PI / 2);
+      const jackMesh = new THREE.Mesh(jackGeo, jackMat);
+      jackMesh.position.set(x, y, z);
+      jackMesh.rotation.y = rotY;
+      headGroup.add(jackMesh);
+    };
 
-      const tubeGeo = new THREE.TubeGeometry(curve, 20, 0.012, 8, false);
+    // Jack sockets on left and right monitor walls
+    createJack(-0.64, -0.22, 0.2, 0);
+    createJack(-0.64, -0.34, 0.28, 0);
+    createJack(0.64, -0.22, 0.2, 0);
+    createJack(0.64, -0.34, 0.28, 0);
+
+    // Bottom jacks
+    createJack(-0.25, -0.56, 0.2, Math.PI / 2);
+    createJack(0.25, -0.56, 0.2, Math.PI / 2);
+
+    const createCable = (
+      p1: [number, number, number],
+      p2: [number, number, number],
+      droop: number
+    ) => {
+      const start = new THREE.Vector3(...p1);
+      const end = new THREE.Vector3(...p2);
+      const mid = new THREE.Vector3(
+        (start.x + end.x) * 0.5 + (Math.random() - 0.5) * 0.06,
+        (start.y + end.y) * 0.5 - droop,
+        (start.z + end.z) * 0.5 + 0.08
+      );
+
+      const curve = new THREE.CatmullRomCurve3([start, mid, end]);
+      const tubeGeo = new THREE.TubeGeometry(curve, 24, 0.013, 8, false);
       return new THREE.Mesh(tubeGeo, cableMat);
     };
 
-    // Add 4 cables on left and right side
-    headGroup.add(createCable(-0.55, -0.4, 0.2, -0.28, -0.65, 0.15));
-    headGroup.add(createCable(-0.48, -0.42, 0.3, -0.2, -0.68, 0.22));
-    headGroup.add(createCable(0.55, -0.4, 0.2, 0.28, -0.65, 0.15));
-    headGroup.add(createCable(0.48, -0.42, 0.3, 0.2, -0.68, 0.22));
+    // Left cables drooping into sweater
+    headGroup.add(createCable([-0.65, -0.22, 0.2], [-0.32, -0.72, 0.18], 0.22));
+    headGroup.add(createCable([-0.65, -0.34, 0.28], [-0.22, -0.74, 0.26], 0.18));
+
+    // Right cables drooping into sweater
+    headGroup.add(createCable([0.65, -0.22, 0.2], [0.32, -0.72, 0.18], 0.22));
+    headGroup.add(createCable([0.65, -0.34, 0.28], [0.22, -0.74, 0.26], 0.18));
+
+    // Bottom cables
+    headGroup.add(createCable([-0.25, -0.56, 0.2], [-0.12, -0.78, 0.22], 0.14));
+    headGroup.add(createCable([0.25, -0.56, 0.2], [0.12, -0.78, 0.22], 0.14));
 
     // ─────────────────────────────────────────────────────────────
-    // 5. Mouse Hover & Interactive Head Rotation Tracking
+    // 7. Interactive Cursor Tracking (Smooth Lerp + Gaze)
     // ─────────────────────────────────────────────────────────────
     const mouse = { x: 0, y: 0 };
     const target = { x: 0, y: 0 };
 
     const handleMouseMove = (e: MouseEvent) => {
-      // Calculate normalized mouse coords (-1 to +1)
       const rect = container.getBoundingClientRect();
       const clientX = e.clientX - rect.left;
       const clientY = e.clientY - rect.top;
@@ -264,9 +349,9 @@ export const RobotHero: React.FC = () => {
     window.addEventListener('mousemove', handleMouseMove);
 
     // ─────────────────────────────────────────────────────────────
-    // 6. Animation Loop (Smooth Lerp + Idle Breathing + Blinking)
+    // 8. Animation Loop (Breathing + Blinking + Inertia Tilt)
     // ─────────────────────────────────────────────────────────────
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
     let blinkTimer = 0;
     let isBlinking = false;
     let animId: number;
@@ -278,37 +363,37 @@ export const RobotHero: React.FC = () => {
       const elapsed = clock.getElapsedTime();
 
       // Smooth interpolation towards mouse position
-      target.x += (mouse.x - target.x) * 0.08;
-      target.y += (mouse.y - target.y) * 0.08;
+      target.x += (mouse.x - target.x) * 0.075;
+      target.y += (mouse.y - target.y) * 0.075;
 
       // Head tilts and turns smoothly
-      headGroup.rotation.y = target.x * 0.65; // Horizontal turn
-      headGroup.rotation.x = -target.y * 0.42 + 0.05; // Vertical tilt
-      headGroup.rotation.z = -target.x * 0.12; // Slight head roll for realism
+      headGroup.rotation.y = target.x * 0.68;
+      headGroup.rotation.x = -target.y * 0.38 + 0.04;
+      headGroup.rotation.z = -target.x * 0.1;
 
-      // Eyes look further towards the cursor
-      eyesGroup.position.x = target.x * 0.06;
-      eyesGroup.position.y = 0.07 + target.y * 0.04;
+      // Eyes look further towards the cursor (gaze tracking)
+      eyesGroup.position.x = target.x * 0.08;
+      eyesGroup.position.y = 0.08 + target.y * 0.05;
 
-      // Subtle breathing motion on torso and head
-      const breath = Math.sin(elapsed * 1.8) * 0.015;
-      characterGroup.position.y = -0.65 + breath;
-      torsoMesh.scale.x = 1.35 + breath * 0.2;
+      // Natural breathing displacement on torso & collar
+      const breath = Math.sin(elapsed * 1.6) * 0.016;
+      characterGroup.position.y = -0.68 + breath;
+      torsoMesh.scale.x = 1.4 + breath * 0.15;
 
-      // Eye blink logic
+      // Natural eye blinking
       blinkTimer += delta;
-      if (!isBlinking && blinkTimer > 3.8 + Math.random() * 2.5) {
+      if (!isBlinking && blinkTimer > 4.0 + Math.random() * 2.5) {
         isBlinking = true;
         blinkTimer = 0;
       }
 
       if (isBlinking) {
-        eyesGroup.scale.y = Math.max(0.08, eyesGroup.scale.y - delta * 12);
-        if (eyesGroup.scale.y <= 0.1) {
+        eyesGroup.scale.y = Math.max(0.06, eyesGroup.scale.y - delta * 14);
+        if (eyesGroup.scale.y <= 0.08) {
           isBlinking = false;
         }
       } else {
-        eyesGroup.scale.y = Math.min(1.0, eyesGroup.scale.y + delta * 10);
+        eyesGroup.scale.y = Math.min(1.0, eyesGroup.scale.y + delta * 12);
       }
 
       renderer.render(scene, camera);
@@ -317,7 +402,7 @@ export const RobotHero: React.FC = () => {
     animate();
 
     // ─────────────────────────────────────────────────────────────
-    // 7. Resize Observer
+    // 9. Resize Handling
     // ─────────────────────────────────────────────────────────────
     const handleResize = () => {
       if (!container) return;
