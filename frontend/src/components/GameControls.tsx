@@ -129,7 +129,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
               fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
               letterSpacing: '0.1em', color: 'var(--text-dim)' }}>
               <Sliders size={12} />
-              AI Strength
+              Engine Strength
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{
