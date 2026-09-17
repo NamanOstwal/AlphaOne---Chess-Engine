@@ -194,8 +194,5 @@ Here multiprocessing helps by distributing the workload across multiple CPU core
 By far you have got an answer of using multiprocessing let's understand how it gonna help the engine:
 In the search process involves exploring possible moves and counter-moves where this search can be broken down into independent tasks that can be executed simultaneously. Multiprocessing allows the chess engine to perform these tasks concurrently across multiple CPU cores, drastically speeding up the search process where each core can explore a different branch of the game tree simultaneously, effectively increasing the search depth within the same amount of time. While one process explores a particular branch, other processes can generate moves for subsequent branches, thus overlapping computation and improving efficiency which helps to process more positions per second.
 
-Feel free to add improvements to this engine via suggestions. 
+Feel free to contribute or explore the WebAssembly and C++ engine implementations!
 
-```bash
-- Satish Kumar
-```
