@@ -24,7 +24,4 @@ foreach ($test in $tests) {
     }
 }
 
-Write-Host "Running Python Parity Verification..." -ForegroundColor Yellow
-python tests/verify_parity.py
-
-Write-Host "All tests passed successfully!" -ForegroundColor Green
+Write-Host "All native C++ test suites passed successfully!" -ForegroundColor Green

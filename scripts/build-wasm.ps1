@@ -8,19 +8,27 @@ Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host " Building AlphaOne WebAssembly Module" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
-# 1. Check for em++ in PATH or in local emsdk
+# 1. Check for em++ in PATH or in emsdk locations
 $emccCmd = Get-Command em++ -ErrorAction SilentlyContinue
 if (-not $emccCmd) {
-    if (Test-Path "$EmsdkDir/upstream/emscripten/em++.bat") {
-        $emccPath = "$EmsdkDir/upstream/emscripten/em++.bat"
-        # Temporarily add to PATH
-        $env:PATH = "$EmsdkDir/upstream/emscripten;$EmsdkDir/node;$env:PATH"
-    } elseif (Test-Path "$EmsdkDir/emsdk.bat") {
-        Write-Host "Activating emsdk environment..." -ForegroundColor Yellow
-        & "$EmsdkDir/emsdk.bat" activate latest
-        $emccPath = "$EmsdkDir/upstream/emscripten/em++.bat"
-    } else {
-        Write-Error "Emscripten compiler (em++) not found. Please run 'python emsdk/emsdk.py install latest && python emsdk/emsdk.py activate latest'."
+    $candidateDirs = @($EmsdkDir, "C:/emsdk")
+    $found = $false
+    foreach ($dir in $candidateDirs) {
+        $exeCandidates = @("$dir/upstream/emscripten/em++.exe", "$dir/upstream/emscripten/em++.bat")
+        foreach ($cand in $exeCandidates) {
+            if (Test-Path $cand) {
+                $emccPath = $cand
+                $env:PATH = "$dir/upstream/emscripten;$dir/node/24.19.0_64bit;$env:PATH"
+                $env:EMSDK = $dir
+                $env:EMSDK_NODE = "$dir/node/24.19.0_64bit/node.exe"
+                $found = $true
+                break
+            }
+        }
+        if ($found) { break }
+    }
+    if (-not $found) {
+        Write-Error "Emscripten compiler (em++) not found. Please verify emsdk installation."
     }
 } else {
     $emccPath = $emccCmd.Source

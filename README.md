@@ -1,28 +1,85 @@
 
-# AlphaOne - Chess Engine 
+# AlphaOne — High-Performance Chess Engine (C++17 & WebAssembly)
 
-## Prerequisites
+AlphaOne is a high-performance chess engine originally written in Python, now fully ported to modern **C++17** and compiled to **WebAssembly (WASM)** with a sleek, modern React/TypeScript web interface.
 
-Before you start, ensure you have the following installed on your system:
+- ⚡ **100% C++17 Backend**: Zero Python or Pygame runtime dependencies.
+- 🚀 **WebAssembly (WASM)**: Runs at near-native speed directly in any modern web browser via Web Workers.
+- ♟️ **Modern Web UI**: Interactive chessboard with drag-and-drop, real-time evaluation bar, engine telemetry, and move history.
+- 💻 **Native CLI**: Interactive terminal interface with UCI move generation, Perft, and NegaMax alpha-beta search.
+- 🧠 **Search & Evaluation**: 64-bit Zobrist hashing, transposition table with bounds, piece-square tables, and move ordering.
 
-- [Python](https://www.python.org/downloads/) (version 3.6 or higher)
+---
 
-## Installation Steps
+## Quick Start
 
-1. **Clone the Repository**:
+### 1. Web Application (React + WebAssembly)
+```bash
+# Install frontend dependencies (if not already installed)
+npm --prefix frontend install
 
-   ```bash
-   git clone https://github.com/NamanOstwal/AlphaOne---Chess-Engine.git
-   cd AlphaOne---Chess-Engine
-   ```
-2. **Install Pygame**:
-   ```bash
-   pip3 install pygame
-   ```
-3. **Run the Chess Engine**:
-   ```bash
-   python3 src/chessmain.py
-   ```
+# Run the local development server
+npm run dev
+```
+Open **[http://localhost:5173](http://localhost:5173)** in your browser.
+
+### 2. Native C++ CLI
+```powershell
+# Build native engine and CLI (Windows PowerShell)
+.\scripts\build-native.ps1
+
+# Run the interactive CLI
+.\bin\alphaone_cli.exe
+```
+
+Inside the CLI shell:
+- `moves` — Show all legal moves in the current position
+- `go 4` — Search for best move at depth 4
+- `d` — Display current board ASCII diagram
+- `fen` — Show current position FEN string
+- `new` — Reset to starting position
+- `quit` — Exit CLI
+
+### 3. Build WebAssembly Module
+```powershell
+# Compile C++ engine to WebAssembly (requires emsdk)
+.\scripts\build-wasm.ps1
+```
+Builds `alphaone.js` and `alphaone.wasm` into `frontend/public/wasm/`.
+
+### 4. Run Test Suite
+```powershell
+.\scripts\test.ps1
+```
+Executes all 5 native C++ test suites (`test_board`, `test_movegen`, `test_perft`, `test_evaluation`, `test_search`).
+
+---
+
+## Architecture
+
+```
+ChessEngine/
+├── src/
+│   ├── engine/           # 100% Pure C++17 Chess Engine
+│   │   ├── Types.hpp     # Pieces, Colors, Squares, CastleRights
+│   │   ├── Move.hpp      # Compact move struct with flags
+│   │   ├── Board.hpp/cpp # State, FEN, make/undo move
+│   │   ├── MoveGenerator.hpp/cpp # Pins, checks, legal move generator
+│   │   ├── Evaluation.hpp/cpp    # Material & piece-square tables
+│   │   ├── Zobrist.hpp/cpp       # 64-bit Zobrist hash keys
+│   │   ├── TranspositionTable.hpp/cpp # Cache with exact/bound types
+│   │   ├── Search.hpp/cpp        # Negamax alpha-beta search
+│   │   └── Engine.hpp/cpp        # High-level engine API
+│   ├── wasm/             # Emscripten / Embind bridge
+│   │   └── WasmBindings.cpp
+│   └── cli/              # Native interactive CLI
+│       └── Main.cpp
+├── frontend/             # Modern React + TypeScript + Vite UI
+├── tests/                # Native C++ Unit & Perft Test Suites
+└── scripts/              # Build and benchmark automation
+```
+
+---
 
 ## Heurestia
 

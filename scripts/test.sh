@@ -20,7 +20,4 @@ for t in "${TESTS[@]}"; do
     fi
 done
 
-echo "Running Python Parity Verification..."
-python3 tests/verify_parity.py
-
-echo "All tests passed successfully!"
+echo "All native C++ test suites passed successfully!"
