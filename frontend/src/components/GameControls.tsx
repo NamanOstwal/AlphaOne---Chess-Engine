@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   RotateCcw, Undo2, ArrowLeftRight, StopCircle, Sliders, User, Bot, Users, Swords,
+  LucideIcon,
 } from 'lucide-react';
 
 interface GameControlsProps {
@@ -20,7 +21,7 @@ const MODES: {
   id: 'white' | 'black' | 'both' | 'ai';
   label: string;
   sublabel: string;
-  Icon: React.FC<{ size?: number; strokeWidth?: number }>;
+  Icon: LucideIcon;
 }[] = [
   { id: 'white', label: 'White', sublabel: 'vs AI',    Icon: User  },
   { id: 'black', label: 'Black', sublabel: 'vs AI',    Icon: User  },
