@@ -5,83 +5,26 @@ import { EngineStats } from './components/EngineStats';
 import { MoveLogPanel } from './components/MoveLogPanel';
 import { GameControls } from './components/GameControls';
 import { CapturedPieces } from './components/CapturedPieces';
+import { RobotHero } from './components/RobotHero';
 import { engineService } from './services/EngineService';
 import { EngineState, SearchStats } from './types/chess';
+import { toggleSound, isSoundEnabled } from './utils/audio';
+import {
+  Volume2,
+  VolumeX,
+  RotateCcw,
+  Cpu,
+  Zap,
+  Shield,
+  Layers,
+  Sparkles,
+  Terminal,
+  Activity,
+  Award,
+  ChevronDown,
+  ArrowRight,
+} from 'lucide-react';
 
-/* ====================================================================
-   Player Panel
-   ==================================================================== */
-interface PlayerPanelProps {
-  name: string;
-  isWhite: boolean;
-  isActiveTurn: boolean;
-  isThinkingTurn: boolean;
-  fen: string;
-}
-
-const PlayerPanel: React.FC<PlayerPanelProps> = ({
-  name, isWhite, isActiveTurn, isThinkingTurn, fen,
-}) => (
-  <div
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      padding: '9px 14px',
-      borderRadius: 10,
-      background: 'var(--bg-elevated)',
-      border: `1.5px solid ${isActiveTurn ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-      boxShadow: isActiveTurn ? '0 0 16px rgba(88,101,242,0.12)' : 'none',
-      transition: 'all 0.2s ease',
-      width: '100%',
-    }}
-  >
-    <div
-      style={{
-        width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-        background: isWhite ? '#f5f5f5' : '#1c1c1c',
-        border: '2px solid #769656',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-      }}
-    >
-      {isWhite ? '♔' : '♚'}
-    </div>
-
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-          {name}
-        </span>
-        {isActiveTurn && (
-          <span style={{
-            fontSize: 10, fontWeight: 700,
-            padding: '2px 8px', borderRadius: 99,
-            background: 'rgba(88,101,242,0.15)',
-            border: '1px solid rgba(88,101,242,0.3)',
-            color: 'var(--accent-primary)',
-            letterSpacing: '0.04em',
-          }}>
-            {isThinkingTurn ? '🤖 Thinking…' : 'YOUR TURN'}
-          </span>
-        )}
-      </div>
-      <CapturedPieces fen={fen} />
-    </div>
-
-    {isActiveTurn && (
-      <div style={{
-        width: 8, height: 8, borderRadius: '50%',
-        background: 'var(--accent-primary)', flexShrink: 0,
-        animation: 'pulse-ring 1.6s ease-out infinite',
-      }} />
-    )}
-  </div>
-);
-
-/* ====================================================================
-   Main App
-   ==================================================================== */
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 const INITIAL_LEGAL_MOVES = [
@@ -109,37 +52,38 @@ export const App: React.FC = () => {
   const [isFlipped,    setIsFlipped]    = useState(false);
   const [playerColor,  setPlayerColor]  = useState<'white' | 'black' | 'both' | 'ai'>('white');
   const [searchDepth,  setSearchDepth]  = useState(4);
-  const [engineReady,  setEngineReady]  = useState(true);
+  const [soundActive,  setSoundActive]  = useState(true);
 
   const stateRef    = useRef(engineState);
   stateRef.current  = engineState;
   const thinkingRef = useRef(isThinking);
   thinkingRef.current = isThinking;
 
-  /* ── Engine initialisation ── */
   useEffect(() => {
-    engineService.onStateChange((newState) => {
-      setEngineState(newState);
-      setEngineReady(true);
+    engineService.onStateChange((s) => {
+      setEngineState(s);
     });
 
     engineService.getLegalMoves().then((moves) => {
-      if (moves && moves.length > 0) {
-        setEngineState((prev) => ({ ...prev, legalMoves: moves }));
-      }
-      setEngineReady(true);
-    }).catch(() => {});
+      setEngineState((prev) => ({
+        ...prev,
+        legalMoves: moves && moves.length > 0 ? moves : prev.legalMoves,
+      }));
+    });
+
+    return () => {
+      engineService.terminate();
+    };
   }, []);
 
-  /* ── AI move trigger ── */
   const triggerAiMove = useCallback(async () => {
     if (thinkingRef.current) return;
-    const s = stateRef.current;
-    if (s.isCheckmate || s.isStalemate) return;
+    const cur = stateRef.current;
+    if (cur.isCheckmate || cur.isStalemate) return;
 
     setIsThinking(true);
     try {
-      const res = await engineService.getBestMove(2000, searchDepth);
+      const res = await engineService.getBestMove(2500, searchDepth);
       if (res.bestMove) {
         setStats(res.stats);
         setLastMove(res.bestMove);
@@ -147,290 +91,874 @@ export const App: React.FC = () => {
         await engineService.makeMove(res.bestMove);
       }
     } catch (err) {
-      console.error('AI move failed:', err);
+      console.error('[AI] Search failed:', err);
     } finally {
       setIsThinking(false);
     }
   }, [searchDepth]);
 
-  /* ── Turn management ── */
   useEffect(() => {
     if (isThinking) return;
     if (engineState.isCheckmate || engineState.isStalemate) return;
-    if (engineState.legalMoves.length === 0) return; // not ready yet
 
     const isAiTurn =
       (playerColor === 'white' && !engineState.isWhiteToMove) ||
       (playerColor === 'black' &&  engineState.isWhiteToMove) ||
       playerColor === 'ai';
 
-    if (!isAiTurn) return;
-
-    const delay = playerColor === 'ai' ? 500 : 200;
-    const t = setTimeout(triggerAiMove, delay);
-    return () => clearTimeout(t);
+    if (isAiTurn) {
+      const delay = playerColor === 'ai' ? 500 : 250;
+      const t = setTimeout(() => triggerAiMove(), delay);
+      return () => clearTimeout(t);
+    }
   }, [
-    engineState.isWhiteToMove, engineState.legalMoves.length,
-    engineState.isCheckmate, engineState.isStalemate,
-    playerColor, isThinking, triggerAiMove,
+    engineState.isWhiteToMove,
+    playerColor,
+    engineState.isCheckmate,
+    engineState.isStalemate,
+    isThinking,
+    triggerAiMove,
   ]);
 
-  /* ── Human move ── */
-  const handleMakeMove = async (uci: string) => {
+  const handleMakeMove = useCallback(async (uci: string) => {
     if (isThinking) return;
+
     setLastMove(uci);
     setMovesHistory((prev) => [...prev, uci]);
+
     const res = await engineService.makeMove(uci);
     if (!res.success) {
-      // Illegal move — revert
       setMovesHistory((prev) => prev.slice(0, -1));
-      setLastMove(movesHistory[movesHistory.length - 1] ?? null);
     }
-  };
+  }, [isThinking]);
 
-  /* ── New Game ── */
-  const handleNewGame = async () => {
+  const handleNewGame = useCallback(async () => {
     engineService.stopSearch();
     setIsThinking(false);
     setLastMove(null);
     setMovesHistory([]);
     setStats(null);
-    try {
-      const s = await engineService.newGame();
-      setEngineState(s);
-    } catch (_) {}
-  };
+    const newState = await engineService.newGame();
+    setEngineState(newState);
+  }, []);
 
-  /* ── Undo ── */
-  const handleUndo = async () => {
+  const handleUndo = useCallback(async () => {
     if (movesHistory.length === 0 || isThinking) return;
     engineService.stopSearch();
     setIsThinking(false);
 
-    const undoCount = (playerColor === 'white' || playerColor === 'black') ? 2 : 1;
-    const actualUndo = Math.min(undoCount, movesHistory.length);
-
-    for (let i = 0; i < actualUndo; i++) {
+    if (playerColor === 'white' || playerColor === 'black') {
       await engineService.undoMove();
+      if (movesHistory.length >= 2) {
+        await engineService.undoMove();
+        setMovesHistory((prev) => prev.slice(0, -2));
+      } else {
+        setMovesHistory((prev) => prev.slice(0, -1));
+      }
+    } else {
+      await engineService.undoMove();
+      setMovesHistory((prev) => prev.slice(0, -1));
     }
-    setMovesHistory((prev) => prev.slice(0, -actualUndo));
     setLastMove(null);
+  }, [movesHistory.length, isThinking, playerColor]);
+
+  const handleSoundToggle = () => {
+    const updated = toggleSound();
+    setSoundActive(updated);
   };
 
-  /* ── Player colour change ── */
-  const handlePlayerColorChange = (mode: 'white' | 'black' | 'both' | 'ai') => {
-    setPlayerColor(mode);
-    setIsFlipped(mode === 'black');
+  const scrollToArena = () => {
+    const arena = document.getElementById('arena-section');
+    arena?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  /* ── Derived values ── */
-  const bottomIsWhite = !isFlipped;
-
-  const isHumanDisabled =
-    isThinking ||
-    !engineReady ||
-    (playerColor === 'white' && !engineState.isWhiteToMove) ||
-    (playerColor === 'black' &&  engineState.isWhiteToMove) ||
-    playerColor === 'ai';
-
-  const bottomPlayerName =
-    playerColor === 'white' ? 'You (White)' :
-    playerColor === 'black' ? 'You (Black)' :
-    playerColor === 'ai'    ? 'AlphaOne AI' :
-    bottomIsWhite ? 'White' : 'Black';
-
-  const topPlayerName =
-    playerColor === 'white' ? 'AlphaOne AI' :
-    playerColor === 'black' ? 'AlphaOne AI' :
-    playerColor === 'ai'    ? 'AlphaOne AI' :
-    bottomIsWhite ? 'Black' : 'White';
-
-  const bottomActive = engineState.isWhiteToMove === bottomIsWhite;
+  const scrollToCapabilities = () => {
+    const cap = document.getElementById('capabilities-section');
+    cap?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* ═══════════════════════ HEADER ═══════════════════════ */}
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 28px', height: 60,
-        background: 'rgba(13,15,20,0.88)',
-        backdropFilter: 'blur(16px)',
-        borderBottom: '1px solid var(--border-subtle)',
-        position: 'sticky', top: 0, zIndex: 100, flexShrink: 0,
-      }}>
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-            background: 'linear-gradient(135deg, #5865f2, #8b5cf6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, boxShadow: '0 4px 14px rgba(88,101,242,0.4)',
-          }}>
-            ♛
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <span style={{
-                fontSize: 17, fontWeight: 800, letterSpacing: '-0.03em',
-                background: 'linear-gradient(90deg, #fff 0%, #94a3b8 100%)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              }}>AlphaOne</span>
-              <span style={{
-                fontSize: 10, fontWeight: 700, color: 'var(--accent-primary)',
-                background: 'rgba(88,101,242,0.12)',
-                border: '1px solid rgba(88,101,242,0.25)',
-                padding: '1px 7px', borderRadius: 99, letterSpacing: '0.04em',
-              }}>WASM</span>
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-              C++17 Chess Engine
-            </div>
-          </div>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-studio-dark)', color: '#fff' }}>
+      {/* ====================================================================
+          1. TOP NAVIGATION BAR (Locomotive Agency Minimalist)
+          ==================================================================== */}
+      <header
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 100,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '24px 36px',
+          background: 'linear-gradient(to bottom, rgba(14,15,18,0.75) 0%, rgba(14,15,18,0) 100%)',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 800,
+              fontSize: 18,
+              letterSpacing: '-0.03em',
+              color: '#111',
+              mixBlendMode: 'difference',
+            }}
+          >
+            AlphaOne®
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              fontFamily: 'var(--font-mono)',
+              color: '#888',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}
+          >
+            C++ / WASM v1.0
+          </span>
         </div>
 
-        {/* Move counter */}
-        {movesHistory.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>Move</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)' }}>
-              {Math.ceil(movesHistory.length / 2)}
-            </span>
-            <div style={{
-              width: 7, height: 7, borderRadius: '50%',
-              background: engineState.isWhiteToMove ? '#f0f0f0' : '#222',
-              border: '1.5px solid rgba(255,255,255,0.25)',
-            }} />
-          </div>
-        )}
+        {/* Center Minimal Geometric Brand Mark */}
+        <div
+          style={{
+            width: 24,
+            height: 24,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#111',
+            mixBlendMode: 'difference',
+            cursor: 'pointer',
+          }}
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 3a9 9 0 0 0 0 18v-18z" fill="currentColor" />
+          </svg>
+        </div>
 
-        {/* Engine status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {isThinking && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8, fontSize: 12,
-              color: 'var(--accent-cyan)',
-              background: 'rgba(34,211,238,0.08)',
-              border: '1px solid rgba(34,211,238,0.2)',
-              padding: '5px 12px', borderRadius: 99,
-            }}>
-              <div className="spinner" style={{ borderTopColor: 'var(--accent-cyan)' }} />
-              AI thinking…
-            </div>
-          )}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
-            color: engineReady ? 'var(--accent-emerald)' : 'var(--text-dim)',
-            background: engineReady ? 'rgba(16,185,129,0.08)' : 'transparent',
-            border: `1px solid ${engineReady ? 'rgba(16,185,129,0.2)' : 'var(--border-subtle)'}`,
-            padding: '5px 12px', borderRadius: 99, transition: 'all 0.3s',
-          }}>
-            <div style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: engineReady ? 'var(--accent-emerald)' : 'var(--text-dim)',
-            }} />
-            {engineReady ? 'Engine Ready' : 'Loading…'}
-          </div>
+        {/* Right Navigation */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          <button
+            onClick={scrollToCapabilities}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#222',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 14,
+              fontWeight: 600,
+              letterSpacing: '-0.01em',
+              cursor: 'pointer',
+              mixBlendMode: 'difference',
+            }}
+          >
+            Capabilities
+          </button>
+          <button
+            onClick={scrollToArena}
+            className="loco-pill"
+            style={{
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            }}
+          >
+            <span>Play Engine</span>
+            <ArrowRight size={14} />
+          </button>
         </div>
       </header>
 
-      {/* ═══════════════════════ MAIN ═══════════════════════ */}
-      <main style={{
-        flex: 1, display: 'flex', justifyContent: 'center',
-        padding: '24px 20px 32px', gap: 20, alignItems: 'flex-start',
-      }}>
-        {/* ── Board column ── */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexShrink: 0 }}>
-          {/* Eval bar */}
-          <EvaluationBar score={engineState.evaluation} isWhiteBottom={!isFlipped} />
+      {/* ====================================================================
+          2. HERO SECTION — REPLICATING LISA.LOCOMOTIVE.CA/EN
+          ==================================================================== */}
+      <section
+        id="hero-section"
+        style={{
+          position: 'relative',
+          width: '100vw',
+          height: '100vh',
+          minHeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          background: 'radial-gradient(ellipse at 50% 36%, #e8e8ea 0%, #cacace 45%, #9c9da3 100%)',
+          overflow: 'hidden',
+          padding: '0 48px',
+        }}
+      >
+        {/* Ambient Subtle Studio Shadow Vignette */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(circle at 50% 90%, rgba(0,0,0,0.35) 0%, transparent 60%)',
+            pointerEvents: 'none',
+          }}
+        />
 
-          {/* Player panels + board */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <PlayerPanel
-              name={topPlayerName}
-              isWhite={isFlipped}
-              isActiveTurn={engineState.isWhiteToMove === isFlipped}
-              isThinkingTurn={isThinking && engineState.isWhiteToMove === isFlipped}
-              fen={engineState.fen}
-            />
+        {/* Left Column: Typography & Interactive Badges */}
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 10,
+            maxWidth: 580,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 24,
+            paddingBottom: 40,
+          }}
+        >
+          {/* Greeting Eyebrow */}
+          <div>
+            <p
+              style={{
+                fontFamily: 'var(--font-sans)',
+                fontSize: 14,
+                color: '#555760',
+                lineHeight: 1.5,
+                fontWeight: 500,
+              }}
+            >
+              Hi there, I am AlphaOne,
+              <br />
+              Locomotive-inspired low latency chess intelligence.
+            </p>
+          </div>
 
-            <Chessboard
-              fen={engineState.fen}
-              isFlipped={isFlipped}
-              legalMoves={engineState.legalMoves}
-              lastMove={lastMove}
-              inCheck={engineState.inCheck}
-              isWhiteToMove={engineState.isWhiteToMove}
-              onMakeMove={handleMakeMove}
-              disabled={isHumanDisabled}
-            />
+          {/* Main Title (Exact User Requirement with Blinking Cursor) */}
+          <h1
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(28px, 3.4vw, 46px)',
+              fontWeight: 700,
+              lineHeight: 1.15,
+              letterSpacing: '-0.035em',
+              color: '#0e0f13',
+            }}
+          >
+            AlphaOne - Low Latency Chess Engine devloped using C++ wth elo ~1500.
+            <span className="blinking-cursor">▌</span>
+          </h1>
 
-            <PlayerPanel
-              name={bottomPlayerName}
-              isWhite={bottomIsWhite}
-              isActiveTurn={bottomActive}
-              isThinkingTurn={isThinking && bottomActive}
-              fen={engineState.fen}
-            />
+          {/* Interactive Filter / Capability Pills */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 6 }}>
+            <button onClick={scrollToArena} className="loco-pill">
+              <Sparkles size={13} />
+              Start a Game
+            </button>
+            <button onClick={scrollToCapabilities} className="loco-pill">
+              <Zap size={13} />
+              1,000,000+ NPS
+            </button>
+            <button onClick={scrollToCapabilities} className="loco-pill">
+              <Cpu size={13} />
+              WebAssembly Core
+            </button>
+            <button onClick={scrollToCapabilities} className="loco-pill">
+              <Activity size={13} />
+              Sub-5ms Latency
+            </button>
+            <button onClick={scrollToCapabilities} className="loco-pill">
+              <Layers size={13} />
+              Zobrist TT Cache
+            </button>
+          </div>
+        </div>
 
-            {/* Game result banners */}
+        {/* Right Column / Center: 3D Robot Head with Human Body */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 'clamp(550px, 60vw, 920px)',
+            height: '100%',
+            pointerEvents: 'auto',
+          }}
+        >
+          <RobotHero />
+        </div>
+
+        {/* Bottom Floating Action Buttons */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 32,
+            left: 48,
+            zIndex: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          {/* Reset / Reload icon button */}
+          <button
+            onClick={() => window.location.reload()}
+            title="Reload Experience"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              backgroundColor: '#0e0f13',
+              color: '#fff',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+              transition: 'transform 0.2s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'rotate(-90deg) scale(1.08)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'rotate(0deg) scale(1)')}
+          >
+            <RotateCcw size={15} />
+          </button>
+
+          <span
+            style={{
+              fontSize: 12,
+              fontFamily: 'var(--font-mono)',
+              color: '#44464f',
+              fontWeight: 500,
+            }}
+          >
+            Hover anywhere to tilt & observe head tracking
+          </span>
+        </div>
+
+        {/* Bottom Right: Sound Toggle Pill */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 32,
+            right: 48,
+            zIndex: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <button
+            onClick={handleSoundToggle}
+            title={soundActive ? 'Mute Audio Effects' : 'Enable Tactile Audio Effects'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 16px',
+              borderRadius: 9999,
+              backgroundColor: '#0e0f13',
+              color: '#fff',
+              border: 'none',
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'var(--font-sans)',
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {soundActive ? <Volume2 size={15} /> : <VolumeX size={15} />}
+            <span>{soundActive ? 'Audio: ON' : 'Audio: MUTE'}</span>
+          </button>
+        </div>
+
+        {/* Scroll down indicator */}
+        <div
+          onClick={scrollToCapabilities}
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 20,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 4,
+            cursor: 'pointer',
+            opacity: 0.75,
+            transition: 'opacity 0.2s ease',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.75')}
+        >
+          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#333' }}>
+            SCROLL TO EXPLORE
+          </span>
+          <ChevronDown size={16} color="#333" className="pulse-soft" />
+        </div>
+      </section>
+
+      {/* ====================================================================
+          3. CAPABILITIES & ARCHITECTURE SECTION
+          ==================================================================== */}
+      <section
+        id="capabilities-section"
+        style={{
+          padding: '120px 48px 100px',
+          maxWidth: 1280,
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 60,
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <span
+            style={{
+              fontSize: 12,
+              fontFamily: 'var(--font-mono)',
+              color: '#8b8e99',
+              letterSpacing: '0.12em',
+            }}
+          >
+            01 / ARCHITECTURE & METRICS
+          </span>
+          <h2
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(26px, 3.2vw, 44px)',
+              fontWeight: 700,
+              letterSpacing: '-0.03em',
+              color: '#f4f4f7',
+              maxWidth: 750,
+            }}
+          >
+            High-Performance C++17 Core Compiled to WebAssembly
+          </h2>
+          <p style={{ fontSize: 15, color: '#888b96', maxWidth: 640, lineHeight: 1.6 }}>
+            AlphaOne completely removes legacy Python and Pygame runtimes in favor of bitboard move generation,
+            iterative deepening alpha-beta pruning, and Zobrist transposition memoization.
+          </p>
+        </div>
+
+        {/* Bento Grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+            gap: 20,
+          }}
+        >
+          {/* Card 1 */}
+          <div className="studio-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Zap size={18} color="#fff" />
+              </div>
+              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: '#8b8e99' }}>THROUGHPUT</span>
+            </div>
+            <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: '-0.02em' }}>
+              1,000,000+ NPS
+            </h3>
+            <p style={{ fontSize: 13, color: '#9da0aa', lineHeight: 1.6 }}>
+              Inner search loops run with zero dynamic heap allocations. Bitboard state caching and raycasting enable
+              sub-millisecond evaluation across millions of board transitions.
+            </p>
+          </div>
+
+          {/* Card 2 */}
+          <div className="studio-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Activity size={18} color="#fff" />
+              </div>
+              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: '#8b8e99' }}>LATENCY</span>
+            </div>
+            <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: '-0.02em' }}>
+              Sub-5ms Tactical Replies
+            </h3>
+            <p style={{ fontSize: 13, color: '#9da0aa', lineHeight: 1.6 }}>
+              Moves are calculated locally in your browser's dedicated Web Worker thread. Zero server hops or API roundtrips
+              provide instantaneous tactical response.
+            </p>
+          </div>
+
+          {/* Card 3 */}
+          <div className="studio-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Award size={18} color="#fff" />
+              </div>
+              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: '#8b8e99' }}>RATING</span>
+            </div>
+            <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: '-0.02em' }}>
+              ELO ~1500 Positional Search
+            </h3>
+            <p style={{ fontSize: 13, color: '#9da0aa', lineHeight: 1.6 }}>
+              Utilizes piece-square positional tables, pin and check raycasting, center control heuristics, and iterative
+              deepening Negamax search up to depth 6.
+            </p>
+          </div>
+
+          {/* Card 4 */}
+          <div className="studio-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Layers size={18} color="#fff" />
+              </div>
+              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: '#8b8e99' }}>CACHE</span>
+            </div>
+            <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: '-0.02em' }}>
+              64-bit Zobrist Memoization
+            </h3>
+            <p style={{ fontSize: 13, color: '#9da0aa', lineHeight: 1.6 }}>
+              Depth-aware transposition table with exact, lower-bound, and upper-bound pruning cutoffs prevents redundant
+              branch recalculation in deep tactical lines.
+            </p>
+          </div>
+
+          {/* Card 5 */}
+          <div className="studio-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Shield size={18} color="#fff" />
+              </div>
+              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: '#8b8e99' }}>CLIENT-SIDE</span>
+            </div>
+            <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: '-0.02em' }}>
+              100% Offline WebAssembly
+            </h3>
+            <p style={{ fontSize: 13, color: '#9da0aa', lineHeight: 1.6 }}>
+              Compiled with Emscripten using -O3 optimization flags. No backend servers, no analytics beacons, and no telemetry
+              overhead. Runs directly in any modern browser.
+            </p>
+          </div>
+
+          {/* Card 6 */}
+          <div className="studio-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Terminal size={18} color="#fff" />
+              </div>
+              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: '#8b8e99' }}>CROSS-PLATFORM</span>
+            </div>
+            <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: '-0.02em' }}>
+              Standalone Native CLI
+            </h3>
+            <p style={{ fontSize: 13, color: '#9da0aa', lineHeight: 1.6 }}>
+              The C++ engine also compiles to a native standalone executable (`alphaone_cli.exe`) for terminal-based benchmarking,
+              UCI interaction, and headless testing.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ====================================================================
+          4. THE ACTUAL PRODUCT / THE CHESS ARENA SECTION
+          ==================================================================== */}
+      <section
+        id="arena-section"
+        style={{
+          padding: '100px 48px 140px',
+          maxWidth: 1360,
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 40,
+        }}
+      >
+        {/* Section Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 20 }}>
+          <div>
+            <span
+              style={{
+                fontSize: 12,
+                fontFamily: 'var(--font-mono)',
+                color: '#8b8e99',
+                letterSpacing: '0.12em',
+              }}
+            >
+              02 / THE ARENA
+            </span>
+            <h2
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 'clamp(28px, 3.4vw, 44px)',
+                fontWeight: 700,
+                letterSpacing: '-0.03em',
+                color: '#fff',
+                marginTop: 6,
+              }}
+            >
+              Play Against AlphaOne
+            </h2>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={handleNewGame} className="loco-pill-dark">
+              <RotateCcw size={14} />
+              Reset Game
+            </button>
+            <button onClick={() => setIsFlipped((prev) => !prev)} className="loco-pill-dark">
+              Flip Board
+            </button>
+          </div>
+        </div>
+
+        {/* Main Chess Arena Grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'auto 1fr',
+            gap: 36,
+            alignItems: 'start',
+          }}
+        >
+          {/* Left Column: Evaluation Bar + Chessboard + Captured Tray */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Top Opponent Player Badge */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 16px',
+                borderRadius: 12,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: '#22252e',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 16,
+                  }}
+                >
+                  🤖
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>
+                    {playerColor === 'black' ? 'You (Black)' : 'AlphaOne AI'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#888' }}>
+                    {playerColor === 'black' ? 'Human Player' : `Depth ${searchDepth} (ELO ~1500)`}
+                  </div>
+                </div>
+              </div>
+              <CapturedPieces fen={engineState.fen} />
+            </div>
+
+            {/* Board + Evaluation Bar */}
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+              <EvaluationBar score={engineState.evaluation} isWhiteBottom={!isFlipped} />
+              <Chessboard
+                fen={engineState.fen}
+                isFlipped={isFlipped}
+                legalMoves={engineState.legalMoves}
+                lastMove={lastMove}
+                inCheck={engineState.inCheck}
+                isWhiteToMove={engineState.isWhiteToMove}
+                onMakeMove={handleMakeMove}
+                disabled={
+                  isThinking ||
+                  (playerColor === 'white' && !engineState.isWhiteToMove) ||
+                  (playerColor === 'black' &&  engineState.isWhiteToMove) ||
+                  playerColor === 'ai'
+                }
+              />
+            </div>
+
+            {/* Bottom Player Badge */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 16px',
+                borderRadius: 12,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: '#f2f2f4',
+                    color: '#111',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 16,
+                  }}
+                >
+                  👤
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>
+                    {playerColor === 'black' ? 'AlphaOne AI' : 'You (White)'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#888' }}>
+                    {engineState.isWhiteToMove ? 'Active Turn' : 'Waiting'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: '#aaa' }}>
+                Move #{movesHistory.length}
+              </div>
+            </div>
+
+            {/* Checkmate / Stalemate Alert */}
             {engineState.isCheckmate && (
-              <div className="game-result-banner banner-checkmate animate-scale-in">
-                ♚ Checkmate! {engineState.isWhiteToMove ? 'Black' : 'White'} wins.
+              <div
+                style={{
+                  padding: '14px 20px',
+                  borderRadius: 12,
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  textAlign: 'center',
+                }}
+              >
+                Checkmate! {engineState.isWhiteToMove ? 'Black' : 'White'} wins the game!
               </div>
             )}
             {engineState.isStalemate && (
-              <div className="game-result-banner banner-stalemate animate-scale-in">
-                ½ Stalemate — Draw.
+              <div
+                style={{
+                  padding: '14px 20px',
+                  borderRadius: 12,
+                  backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  textAlign: 'center',
+                }}
+              >
+                Stalemate! Draw by lack of legal moves.
               </div>
             )}
           </div>
-        </div>
 
-        {/* ── Right Sidebar ── */}
-        <div style={{
-          display: 'flex', flexDirection: 'column', gap: 14,
-          width: 285, flexShrink: 0, minHeight: 0,
-        }}>
-          <EngineStats stats={stats} isThinking={isThinking} />
+          {/* Right Column: Engine Stats + Controls + Move Log */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <EngineStats stats={stats} isThinking={isThinking} />
 
-          <GameControls
-            onNewGame={handleNewGame}
-            onUndo={handleUndo}
-            onFlipBoard={() => setIsFlipped((p) => !p)}
-            isThinking={isThinking}
-            onStopSearch={() => {
-              engineService.stopSearch();
-              setIsThinking(false);
-            }}
-            depth={searchDepth}
-            onDepthChange={setSearchDepth}
-            playerColor={playerColor}
-            onPlayerColorChange={handlePlayerColorChange}
-            moveCount={movesHistory.length}
-          />
+            <GameControls
+              onNewGame={handleNewGame}
+              onUndo={handleUndo}
+              onFlipBoard={() => setIsFlipped((prev) => !prev)}
+              isThinking={isThinking}
+              onStopSearch={() => engineService.stopSearch()}
+              depth={searchDepth}
+              onDepthChange={setSearchDepth}
+              playerColor={playerColor}
+              onPlayerColorChange={setPlayerColor}
+              moveCount={movesHistory.length}
+            />
 
-          <div style={{ flex: 1, minHeight: 220, display: 'flex', flexDirection: 'column' }}>
             <MoveLogPanel moves={movesHistory} />
           </div>
         </div>
-      </main>
+      </section>
 
-      {/* ═══════════════════════ FOOTER ═══════════════════════ */}
-      <footer style={{
-        padding: '12px 28px',
-        borderTop: '1px solid var(--border-subtle)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        fontSize: 11, color: 'var(--text-dim)',
-        background: 'rgba(13,15,20,0.5)', flexShrink: 0,
-      }}>
-        <span>AlphaOne — C++17 compiled to WebAssembly</span>
-        <div style={{ display: 'flex', gap: 12 }}>
-          {['Alpha-Beta', 'Zobrist Hashing', 'Transposition Table', 'Move Ordering'].map((f, i, arr) => (
-            <React.Fragment key={f}>
-              <span>{f}</span>
-              {i < arr.length - 1 && <span style={{ opacity: 0.3 }}>·</span>}
-            </React.Fragment>
-          ))}
+      {/* ====================================================================
+          5. FOOTER
+          ==================================================================== */}
+      <footer
+        style={{
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          padding: '40px 48px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 20,
+          color: '#777a84',
+          fontSize: 13,
+        }}
+      >
+        <div>
+          <span style={{ fontWeight: 700, color: '#d1d4dc' }}>AlphaOne Chess Engine</span>
+          {' — '}
+          Modern C++17 ported to WebAssembly
+        </div>
+        <div style={{ display: 'flex', gap: 20 }}>
+          <span>100% Client-Side Compute</span>
+          <span>Zero Server Latency</span>
+          <span>Zero Pygame Dependency</span>
         </div>
       </footer>
     </div>
